@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']
     CORS_ALLOW_HEADERS: list[str] = ['*']
+    REQUIRE_REVIEW_LECTURER_COMMENT: bool = True
 
     class Config:
         """Pydantic BaseSettings config"""
