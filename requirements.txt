@@ -5,6 +5,7 @@ fastapi-sqlalchemy
 gunicorn
 logging-profcomff
 psycopg2-binary
-pydantic[dotenv]
+pydantic
+pydantic-settings
 SQLAlchemy
 uvicorn
