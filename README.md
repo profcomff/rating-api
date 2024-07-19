@@ -2,6 +2,8 @@
 
 Хранение и работа с рейтингом преподавателей и отзывами на них.
 
+[<img src="https://cdn.profcomff.com/easycode/easycode.svg" width="200"></img>](https://easycode.profcomff.com/templates/docker-fastapi/workspace?mode=manual&param.Repository+URL=https://github.com/profcomff/rating-api.git&param.Working+directory=rating-api)
+
 ## Запуск
 
 1. Перейдите в папку проекта
