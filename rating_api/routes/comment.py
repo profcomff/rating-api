@@ -1,10 +1,11 @@
 import datetime
 from typing import Annotated, Literal
+from uuid import UUID
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
-from uuid import UUID
+
 from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.schemas.base import StatusResponseModel

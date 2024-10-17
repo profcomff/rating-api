@@ -7,22 +7,19 @@ from sqlalchemy.orm import Session
 from starlette import status
 from starlette.testclient import TestClient
 
-from models import Lecturer, ReviewStatus, Comment, LecturerUserComment
+from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.models import LecturerPost
 from rating_api.settings import get_settings
+
 
 logger = logging.getLogger(__name__)
 url: str = '/comment'
 
 settings = get_settings()
 
+
 def test_create_comment(client, dbsession):
-    body = {
-        "first_name": 'Иван',
-        "last_name": 'Иванов',
-        "middle_name": 'Иванович',
-        "timetable_id": 0
-    }
+    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
     lecturer: Lecturer = Lecturer(**body)
     dbsession.add(lecturer)
     dbsession.commit()
@@ -34,16 +31,18 @@ def test_create_comment(client, dbsession):
         "mark_freebie": -2,
         "mark_clarity": 0,
     }
-    params = {
-        "lecturer_id": lecturer.id
-    }
+    params = {"lecturer_id": lecturer.id}
     post_response = client.post(url, json=body, params=params)
     print(post_response.json())
     assert post_response.status_code == status.HTTP_200_OK
     json_response = post_response.json()
     comment = Comment.query(session=dbsession).filter(Comment.uuid == json_response["uuid"]).one_or_none()
     assert comment is not None
-    user_comment = LecturerUserComment.query(session=dbsession).filter(LecturerUserComment.lecturer_id==lecturer.id).one_or_none()
+    user_comment = (
+        LecturerUserComment.query(session=dbsession)
+        .filter(LecturerUserComment.lecturer_id == lecturer.id)
+        .one_or_none()
+    )
     assert user_comment is not None
     dbsession.delete(user_comment)
     dbsession.delete(comment)
@@ -51,6 +50,7 @@ def test_create_comment(client, dbsession):
     dbsession.commit()
     post_response = client.post(url, json=body, params=params)
     assert post_response.status_code == status.HTTP_404_NOT_FOUND
+
 
 def test_get_comment(client, dbsession):
     body = {
@@ -70,7 +70,7 @@ def test_get_comment(client, dbsession):
         "mark_kindness": 1,
         "mark_freebie": -2,
         "mark_clarity": 0,
-        "review_status": ReviewStatus.APPROVED
+        "review_status": ReviewStatus.APPROVED,
     }
     comment: Comment = Comment(**body)
     dbsession.add(comment)
@@ -86,13 +86,9 @@ def test_get_comment(client, dbsession):
     dbsession.delete(lecturer)
     dbsession.commit()
 
+
 def test_delete_comment(client, dbsession):
-    body = {
-        "first_name": 'Иван',
-        "last_name": 'Иванов',
-        "middle_name": 'Иванович',
-        "timetable_id": 0
-    }
+    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
     lecturer: Lecturer = Lecturer(**body)
     dbsession.add(lecturer)
     dbsession.commit()
@@ -104,7 +100,7 @@ def test_delete_comment(client, dbsession):
         "mark_kindness": 1,
         "mark_freebie": -2,
         "mark_clarity": 0,
-        "review_status": ReviewStatus.APPROVED
+        "review_status": ReviewStatus.APPROVED,
     }
     comment: Comment = Comment(**body)
     dbsession.add(comment)

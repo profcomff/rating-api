@@ -1,7 +1,8 @@
 import datetime
+from uuid import UUID
 
 from rating_api.schemas.base import Base
-from uuid import UUID
+
 
 class CommentGet(Base):
     uuid: UUID
