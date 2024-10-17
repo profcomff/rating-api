@@ -1,13 +1,8 @@
 import logging
-from datetime import datetime, timedelta
 
-import httpx as httpx
-from sqlalchemy.orm import Session
 from starlette import status
-from starlette.testclient import TestClient
 
-from models import Comment, Lecturer, ReviewStatus
-from rating_api.schemas.models import LecturerPost
+from rating_api.models import Comment, Lecturer, ReviewStatus
 from rating_api.settings import get_settings
 
 
