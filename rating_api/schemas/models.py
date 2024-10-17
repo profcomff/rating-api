@@ -1,10 +1,10 @@
 import datetime
 
 from rating_api.schemas.base import Base
-
+from uuid import UUID
 
 class CommentGet(Base):
-    uuid: str
+    uuid: UUID
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str

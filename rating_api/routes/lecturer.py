@@ -156,13 +156,6 @@ async def update_lecturer(
     if lecturer is None:
         raise ObjectNotFound(Lecturer, id)
 
-    for comment in lecturer.comments:
-        Comment.delete(comment.uuid, session=db.session)
-
-    lecturer_user_comments = LecturerUserComment.query(session=db.session).filter(LecturerUserComment.lecturer_id == id)
-    for lecturer_user_comment in lecturer_user_comments:
-        LecturerUserComment.delete(lecturer_user_comment.id, session=db.session)
-
     check_timetable_id = (
         Lecturer.query(session=db.session)
         .filter(and_(Lecturer.timetable_id == lecturer_info.timetable_id, Lecturer.id != id))
@@ -188,6 +181,13 @@ async def delete_lecturer(
     check_lecturer = Lecturer.get(session=db.session, id=id)
     if check_lecturer is None:
         raise ObjectNotFound(Lecturer, id)
+    for comment in check_lecturer.comments:
+        Comment.delete(id=comment.uuid, session=db.session)
+
+    lecturer_user_comments = LecturerUserComment.query(session=db.session).filter(LecturerUserComment.lecturer_id == id)
+    for lecturer_user_comment in lecturer_user_comments:
+        LecturerUserComment.delete(lecturer_user_comment.id, session=db.session)
+
     Lecturer.delete(session=db.session, id=id)
     return StatusResponseModel(
         status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI"

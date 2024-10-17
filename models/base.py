@@ -52,6 +52,8 @@ class BaseDbModel(Base):
         if not with_deleted and hasattr(cls, "is_deleted"):
             objs = objs.filter(not_(cls.is_deleted))
         try:
+            if hasattr(cls, "uuid"):
+                return objs.filter(cls.uuid == id).one()
             return objs.filter(cls.id == id).one()
         except NoResultFound:
             raise ObjectNotFound(cls, id)

@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
-
+from uuid import UUID
 from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.schemas.base import StatusResponseModel
@@ -56,7 +56,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
 
 @comment.get("/{uuid}", response_model=CommentGet)
-async def get_comment(uuid: str) -> CommentGet:
+async def get_comment(uuid: UUID) -> CommentGet:
     """
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
@@ -116,7 +116,7 @@ async def get_comments(
 
 @comment.patch("/{uuid}", response_model=CommentGet)
 async def review_comment(
-    uuid: str,
+    uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
     _=Depends(UnionAuth(scopes=["rating.comment.review"], allow_none=False, auto_error=True)),
 ) -> CommentGet:
@@ -136,7 +136,7 @@ async def review_comment(
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
-    uuid: str, _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
+    uuid: UUID, _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
 ):
     """
     Scopes: `["rating.comment.delete"]`
