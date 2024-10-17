@@ -1,11 +1,11 @@
 from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
-from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost

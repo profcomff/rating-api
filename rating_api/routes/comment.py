@@ -1,23 +1,18 @@
 import datetime
-from typing import Annotated, Literal
+from typing import Literal
 from uuid import UUID
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
-from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
     CommentGetAll,
     CommentPost,
-    LecturerGet,
-    LecturerGetAll,
-    LecturerPatch,
-    LecturerPost,
-    LecturerUserCommentPost,
 )
 from rating_api.settings import Settings, get_settings
 
