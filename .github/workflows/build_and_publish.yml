@@ -54,7 +54,7 @@ jobs:
     runs-on: [self-hosted, Linux, testing]
     environment:
       name: Testing
-      url: https://api.test.profcomff.com/rating
+      url: https://api.test.profcomff.com/?urls.primaryName=rating
     env:
       CONTAINER_NAME: com_profcomff_api_rating_test
     permissions:
@@ -96,7 +96,7 @@ jobs:
     runs-on: [self-hosted, Linux, production]
     environment:
       name: Production
-      url: https://api.profcomff.com/rating
+      url: https://api.profcomff.com/?urls.primaryName=rating
     env:
       CONTAINER_NAME: com_profcomff_api_rating
     permissions:
