@@ -3,8 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
 
 from rating_api import __version__
-from rating_api.settings import get_settings
+from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
+from rating_api.settings import get_settings
+
 
 settings = get_settings()
 app = FastAPI(
@@ -33,3 +35,4 @@ app.add_middleware(
 )
 
 app.include_router(lecturer)
+app.include_router(comment)

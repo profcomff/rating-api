@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
+
 class Base(BaseModel):
     def __repr__(self) -> str:
         attrs = []

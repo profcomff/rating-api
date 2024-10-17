@@ -3,19 +3,26 @@ from __future__ import annotations
 import datetime
 import logging
 from enum import Enum
-from rating_api.settings import get_settings
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .base import BaseDbModel
+
+from sqlalchemy import Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
+from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from rating_api.settings import get_settings
+
+from .base import BaseDbModel
+
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
 
 class ReviewStatus(str, Enum):
     APPROVED: str = "approved"
     PENDING: str = "pending"
     DISMISSED: str = "dismissed"
+
 
 class Lecturer(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -26,6 +33,7 @@ class Lecturer(BaseDbModel):
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
+
 
 class Comment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -39,6 +47,7 @@ class Comment(BaseDbModel):
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
     lecturer: Mapped[Lecturer] = relationship("Lecturer", back_populates="comments")
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

@@ -1,17 +1,18 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi_sqlalchemy import db
-from sqlalchemy import func, and_
-from models import Lecturer, ReviewStatus
 # from auth_backend.base import StatusResponseModel
 # from auth_backend.models.db import Scope, UserSession
 # from auth_backend.schemas.models import ScopeGet, ScopePatch, ScopePost
 from auth_lib.fastapi import UnionAuth
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi_sqlalchemy import db
+from sqlalchemy import and_, func
 
+from models import Lecturer, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import LecturerGet, LecturerPost, Comment, LecturerGetAll, LecturerPatch
+from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
+
 
 lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
 
@@ -26,22 +27,20 @@ async def create_lecturer(
 
     Создает преподавателя в базе данных RatingAPI
     """
-    get_lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
+    get_lecturer: Lecturer = (
+        Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
+    )
     if get_lecturer is None:
         new_lecturer: Lecturer = Lecturer.create(session=db.session, **lecturer_info.dict())
         return LecturerGet.model_validate(new_lecturer)
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
-
-
-
 @lecturer.get("/{id}", response_model=LecturerGet)
 async def get_lecturer(
-    id: int, info: list[Literal["comments", "mark"]] = Query(
-            default=[]
-        ),
-        _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
+    id: int,
+    info: list[Literal["comments", "mark"]] = Query(default=[]),
+    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
 ) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.read"]`
@@ -60,8 +59,11 @@ async def get_lecturer(
     result = LecturerGet.model_validate(lecturer)
     result.comments = None
     if lecturer.comments:
-        approved_comments: list[Comment] = [Comment.model_validate(comment) for comment in lecturer.comments if
-                                            comment.review_status is ReviewStatus.APPROVED]
+        approved_comments: list[CommentGet] = [
+            CommentGet.model_validate(comment)
+            for comment in lecturer.comments
+            if comment.review_status is ReviewStatus.APPROVED
+        ]
         if "comments" in info and approved_comments:
             result.comments = approved_comments
         if "mark" in info and approved_comments:
@@ -75,20 +77,14 @@ async def get_lecturer(
     return result
 
 
-
-
-
 @lecturer.get("", response_model=LecturerGetAll)
 async def get_lecturers(
     limit: int = 10,
     offset: int = 0,
-
-    info: list[Literal["comments", "mark"]] = Query(
-            default=[]
-        ),
+    info: list[Literal["comments", "mark"]] = Query(default=[]),
     order_by: list[Literal["general", '']] = Query(default=[]),
     subject: str = Query(''),
-    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True))
+    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
 ) -> LecturerGetAll:
     """
     Scopes: `["rating.lecturer.read"]`
@@ -112,22 +108,32 @@ async def get_lecturers(
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
-    for db_lecturer in lecturers[offset: limit+offset]:
+    for db_lecturer in lecturers[offset : limit + offset]:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
         if db_lecturer.comments:
-            approved_comments: list[Comment] = [Comment.model_validate(comment) for comment in db_lecturer.comments if
-                                                comment.review_status is ReviewStatus.APPROVED]
+            approved_comments: list[CommentGet] = [
+                CommentGet.model_validate(comment)
+                for comment in db_lecturer.comments
+                if comment.review_status is ReviewStatus.APPROVED
+            ]
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
                 lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
-                    approved_comments)
+                    approved_comments
+                )
                 lecturer_to_result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(
-                    approved_comments)
+                    approved_comments
+                )
                 lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
-                    approved_comments)
-                general_marks = [lecturer_to_result.mark_freebie, lecturer_to_result.mark_kindness, lecturer_to_result.mark_clarity]
+                    approved_comments
+                )
+                general_marks = [
+                    lecturer_to_result.mark_freebie,
+                    lecturer_to_result.mark_kindness,
+                    lecturer_to_result.mark_clarity,
+                ]
                 lecturer_to_result.mark_general = sum(general_marks) / len(general_marks)
             if not lecturer_to_result.subject and approved_comments:
                 lecturer_to_result.subject = approved_comments[-1].subject
@@ -136,22 +142,22 @@ async def get_lecturers(
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     if subject:
         result.lecturers = [lecturer for lecturer in result.lecturers if lecturer.subject == subject]
+    result.total = len(result.lecturers)
     return result
-
-
-
 
 
 @lecturer.patch("/{id}", response_model=LecturerGet)
 async def update_lecturer(
     id: int,
     lecturer_info: LecturerPatch,
-    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True))
+    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
 ) -> LecturerGet:
     """
     Scopes: `["auth.scope.update"]`
     """
     lecturer = Lecturer.get(id, session=db.session)
+    if lecturer is None:
+        raise ObjectNotFound(Lecturer, id)
     result = LecturerGet.model_validate(
         Lecturer.update(lecturer.id, **lecturer_info.model_dump(exclude_unset=True), session=db.session)
     )
@@ -161,11 +167,15 @@ async def update_lecturer(
 
 @lecturer.delete("/{id}", response_model=StatusResponseModel)
 async def delete_lecturer(
-    id: int,
-    _=Depends(UnionAuth(scopes=["rating.lecturer.delete"], allow_none=False, auto_error=True))
+    id: int, _=Depends(UnionAuth(scopes=["rating.lecturer.delete"], allow_none=False, auto_error=True))
 ):
     """
     Scopes: `["rating.lecturer.delete"]`
     """
+    check_lecturer = Lecturer.get(session=db.session, id=id)
+    if check_lecturer is None:
+        raise ObjectNotFound(Lecturer, id)
     Lecturer.delete(session=db.session, id=id)
-    return StatusResponseModel(status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI")
+    return StatusResponseModel(
+        status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI"
+    )
