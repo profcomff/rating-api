@@ -58,7 +58,7 @@ jobs:
         with:
           requirementsFiles: "requirements.txt requirements.dev.txt"
       - uses: psf/black@stable
-      - name: CommentGet if linting failed
+      - name: Comment if linting failed
         if: ${{ failure() }}
         uses: thollander/actions-comment-pull-request@v2
         with:
