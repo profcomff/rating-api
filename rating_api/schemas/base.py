@@ -8,4 +8,10 @@ class Base(BaseModel):
             attrs.append(f"{k}={v}")
         return "{}({})".format(self.__class__.__name__, ', '.join(attrs))
 
-    model_config = ConfigDict(from_attributes=True, extra="ignore")
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatusResponseModel(Base):
+    status: str
+    message: str
+    ru: str

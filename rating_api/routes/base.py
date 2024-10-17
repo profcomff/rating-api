@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
 
 from rating_api import __version__
+from rating_api.routes.comment import comment
+from rating_api.routes.lecturer import lecturer
 from rating_api.settings import get_settings
 
 
@@ -31,3 +33,6 @@ app.add_middleware(
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
+
+app.include_router(lecturer)
+app.include_router(comment)

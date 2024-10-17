@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
     ROOT_PATH: str = '/' + os.getenv("APP_NAME", "")
-
+    COMMENT_CREATE_FREQUENCY_IN_MINUTES: int = 1
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']
@@ -21,5 +21,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    settings = Settings()
-    return settings
+    return Settings()
