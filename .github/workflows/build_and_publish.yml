@@ -56,7 +56,7 @@ jobs:
       name: Testing
       url: https://api.test.profcomff.com/rating
     env:
-      CONTAINER_NAME: com_profcomff_api_rating_api_test
+      CONTAINER_NAME: com_profcomff_api_rating_test
     permissions:
       packages: read
 
@@ -98,7 +98,7 @@ jobs:
       name: Production
       url: https://api.profcomff.com/rating
     env:
-      CONTAINER_NAME: com_profcomff_api_rating_api
+      CONTAINER_NAME: com_profcomff_api_rating
     permissions:
       packages: read
 
