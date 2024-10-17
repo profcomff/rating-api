@@ -4,7 +4,7 @@ from rating_api.schemas.base import Base
 
 
 class CommentGet(Base):
-    id: int
+    uuid: str
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str

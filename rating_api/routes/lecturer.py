@@ -1,14 +1,11 @@
 from typing import Literal
 
-# from auth_backend.base import StatusResponseModel
-# from auth_backend.models.db import Scope, UserSession
-# from auth_backend.schemas.models import ScopeGet, ScopePatch, ScopePost
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import and_, func
+from sqlalchemy import and_
 
-from models import Lecturer, ReviewStatus
+from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
@@ -31,7 +28,7 @@ async def create_lecturer(
         Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
     )
     if get_lecturer is None:
-        new_lecturer: Lecturer = Lecturer.create(session=db.session, **lecturer_info.dict())
+        new_lecturer: Lecturer = Lecturer.create(session=db.session, **lecturer_info.model_dump())
         return LecturerGet.model_validate(new_lecturer)
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
@@ -158,6 +155,22 @@ async def update_lecturer(
     lecturer = Lecturer.get(id, session=db.session)
     if lecturer is None:
         raise ObjectNotFound(Lecturer, id)
+
+    for comment in lecturer.comments:
+        Comment.delete(comment.uuid, session=db.session)
+
+    lecturer_user_comments = LecturerUserComment.query(session=db.session).filter(LecturerUserComment.lecturer_id == id)
+    for lecturer_user_comment in lecturer_user_comments:
+        LecturerUserComment.delete(lecturer_user_comment.id, session=db.session)
+
+    check_timetable_id = (
+        Lecturer.query(session=db.session)
+        .filter(and_(Lecturer.timetable_id == lecturer_info.timetable_id, Lecturer.id != id))
+        .one_or_none()
+    )
+    if check_timetable_id:
+        raise AlreadyExists(Lecturer.timetable_id, lecturer_info.timetable_id)
+
     result = LecturerGet.model_validate(
         Lecturer.update(lecturer.id, **lecturer_info.model_dump(exclude_unset=True), session=db.session)
     )

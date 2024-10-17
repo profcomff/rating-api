@@ -1,13 +1,9 @@
 import datetime
 from typing import Annotated, Literal
 
-# from auth_backend.base import StatusResponseModel
-# from auth_backend.models.db import Scope, UserSession
-# from auth_backend.schemas.models import ScopeGet, ScopePatch, ScopePost
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import and_, func
 
 from models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests
@@ -52,26 +48,21 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                 - datetime.datetime.utcnow()
             )
 
-    LecturerUserComment.create(
-        session=db.session,
-        **LecturerUserCommentPost(
-            **comment_info.dict(exclude_unset=True), lecturer_id=lecturer_id, user_id=user.get('id')
-        ).dict(),
-    )
+    LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
     new_comment = Comment.create(
-        session=db.session, **comment_info.dict(), lecturer_id=lecturer_id, review_status=ReviewStatus.PENDING
+        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id, review_status=ReviewStatus.PENDING
     )
     return CommentGet.model_validate(new_comment)
 
 
-@comment.get("/{id}", response_model=CommentGet)
-async def get_comment(id: int) -> CommentGet:
+@comment.get("/{uuid}", response_model=CommentGet)
+async def get_comment(uuid: str) -> CommentGet:
     """
-    Возвращает комментарий по его ID в базе данных RatingAPI
+    Возвращает комментарий по его UUID в базе данных RatingAPI
     """
-    comment: Comment = Comment.query(session=db.session).filter(Comment.id == id).one_or_none()
+    comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if comment is None:
-        raise ObjectNotFound(Comment, id)
+        raise ObjectNotFound(Comment, uuid)
     return CommentGet.model_validate(comment)
 
 
@@ -89,7 +80,9 @@ async def get_comments(
 
     `limit` - максимальное количество возвращаемых комментариев
 
-    `offset` - нижняя граница получения комментариев, т.е. если по дефолту первым возвращается комментарий с условным номером N, то при наличии ненулевого offset будет возвращаться комментарий с номером N + offset
+    `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
+    Если без смещения возвращается комментарий с условным номером N,
+    то при значении offset = X будет возвращаться комментарий с номером N + X
 
     `order_by` - возможное значение `'create_ts'` - возвращается список комментариев отсортированных по времени создания
 
@@ -121,40 +114,39 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{id}", response_model=CommentGet)
+@comment.patch("/{uuid}", response_model=CommentGet)
 async def review_comment(
-    id: int,
+    uuid: str,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
     _=Depends(UnionAuth(scopes=["rating.comment.review"], allow_none=False, auto_error=True)),
 ) -> CommentGet:
     """
     Scopes: `["rating.comment.review"]`
-    Проверка комментария и присваивания ему статуса по его ID в базе данных RatingAPI
+    Проверка комментария и присваивания ему статуса по его UUID в базе данных RatingAPI
 
     `review_status` - возможные значения
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
     """
-    check_comment: Comment = Comment.query(session=db.session).filter(Comment.id == id).one_or_none()
+    check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if not check_comment:
-        raise ObjectNotFound(Comment, id)
-    return CommentGet.model_validate(Comment.update(session=db.session, id=id, review_status=review_status))
+        raise ObjectNotFound(Comment, uuid)
+    return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
 
-@comment.delete("/{id}", response_model=StatusResponseModel)
+@comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
-    id: int,
-    # _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
+    uuid: str, _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
 ):
     """
     Scopes: `["rating.comment.delete"]`
 
-    Удаляет комментарий по его ID в базе данных RatingAPI
+    Удаляет комментарий по его UUID в базе данных RatingAPI
     """
-    check_comment = Comment.get(session=db.session, id=id)
+    check_comment = Comment.get(session=db.session, id=uuid)
     if check_comment is None:
-        raise ObjectNotFound(Comment, id)
-    Comment.delete(session=db.session, id=id)
+        raise ObjectNotFound(Comment, uuid)
+    Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import datetime
 import logging
+import uuid
 from enum import Enum
 
-from sqlalchemy import Boolean, DateTime
+from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -36,7 +37,7 @@ class Lecturer(BaseDbModel):
 
 
 class Comment(BaseDbModel):
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4())
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     subject: Mapped[str] = mapped_column(String, nullable=False)

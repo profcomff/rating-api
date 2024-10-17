@@ -29,7 +29,6 @@ class Base:
 
 class BaseDbModel(Base):
     __abstract__ = True
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
     @classmethod
     def create(cls, *, session: Session, **kwargs) -> BaseDbModel:
@@ -47,7 +46,7 @@ class BaseDbModel(Base):
         return objs
 
     @classmethod
-    def get(cls, id: int, *, with_deleted=False, session: Session) -> BaseDbModel:
+    def get(cls, id: int | str, *, with_deleted=False, session: Session) -> BaseDbModel:
         """Get object with soft deletes"""
         objs = session.query(cls)
         if not with_deleted and hasattr(cls, "is_deleted"):
@@ -58,7 +57,7 @@ class BaseDbModel(Base):
             raise ObjectNotFound(cls, id)
 
     @classmethod
-    def update(cls, id: int, *, session: Session, **kwargs) -> BaseDbModel:
+    def update(cls, id: int | str, *, session: Session, **kwargs) -> BaseDbModel:
         obj = cls.get(id, session=session)
         for k, v in kwargs.items():
             setattr(obj, k, v)
@@ -66,7 +65,7 @@ class BaseDbModel(Base):
         return obj
 
     @classmethod
-    def delete(cls, id: int, *, session: Session) -> None:
+    def delete(cls, id: int | str, *, session: Session) -> None:
         """Soft delete object if possible, else hard delete"""
         obj = cls.get(id, session=session)
         if hasattr(obj, "is_deleted"):
