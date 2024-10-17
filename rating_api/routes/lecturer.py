@@ -150,10 +150,10 @@ async def get_lecturers(
 async def update_lecturer(
     id: int,
     lecturer_info: LecturerPatch,
-    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
+    _=Depends(UnionAuth(scopes=["rating.lecturer.update"], allow_none=False, auto_error=True)),
 ) -> LecturerGet:
     """
-    Scopes: `["auth.scope.update"]`
+    Scopes: `["rating.lecturer.update"]`
     """
     lecturer = Lecturer.get(id, session=db.session)
     if lecturer is None:
