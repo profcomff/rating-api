@@ -6,14 +6,10 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import (
-    CommentGet,
-    CommentGetAll,
-    CommentPost,
-)
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost
 from rating_api.settings import Settings, get_settings
 
 
@@ -86,7 +82,7 @@ async def get_comments(
 
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
     """
-    comments = Comment.query(session=db.session).all()
+    comments = Comment.query(session=db.session).filter(Comment.is_deleted == False).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
@@ -142,8 +138,7 @@ async def delete_comment(
     check_comment = Comment.get(session=db.session, id=uuid)
     if check_comment is None:
         raise ObjectNotFound(Comment, uuid)
-    Comment.delete(session=db.session, id=uuid)
-
+    Comment.update(session=db.session, id=uuid, is_deleted=True)
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
 
@@ -101,7 +101,7 @@ async def get_lecturers(
     Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с их предметом преподавания.
     Также возвращает всех преподавателей, у которых есть комментарий с совпадающим с данным subject.
     """
-    lecturers = Lecturer.query(session=db.session).all()
+    lecturers = Lecturer.query(session=db.session).filter(Lecturer.is_deleted == False).all()
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
@@ -188,7 +188,7 @@ async def delete_lecturer(
     for lecturer_user_comment in lecturer_user_comments:
         LecturerUserComment.delete(lecturer_user_comment.id, session=db.session)
 
-    Lecturer.delete(session=db.session, id=id)
+    Lecturer.update(session=db.session, id=id, is_deleted=True)
     return StatusResponseModel(
         status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI"
     )
