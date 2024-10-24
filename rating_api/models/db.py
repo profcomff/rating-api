@@ -30,7 +30,6 @@ class Lecturer(BaseDbModel):
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
     middle_name: Mapped[str] = mapped_column(String, nullable=False)
-    subject: Mapped[str] = mapped_column(String, nullable=True)
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")

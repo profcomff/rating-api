@@ -42,7 +42,7 @@ class LecturerGet(Base):
     last_name: str
     middle_name: str
     avatar_link: str | None = None
-    subject: str | None = None
+    subjects: list[str] | None = None
     timetable_id: int
     mark_kindness: float | None = None
     mark_freebie: float | None = None
@@ -62,7 +62,6 @@ class LecturerPost(Base):
     first_name: str
     last_name: str
     middle_name: str
-    subject: str | None = None
     avatar_link: str | None = None
     timetable_id: int
 
@@ -71,6 +70,5 @@ class LecturerPatch(Base):
     first_name: str | None = None
     last_name: str | None = None
     middle_name: str | None = None
-    subject: str | None = None
     avatar_link: str | None = None
     timetable_id: int | None = None

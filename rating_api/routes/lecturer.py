@@ -69,8 +69,8 @@ async def get_lecturer(
             result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
             general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
             result.mark_general = sum(general_marks) / len(general_marks)
-        if not result.subject and approved_comments:
-            result.subject = approved_comments[-1].subject
+        if approved_comments:
+            result.subjects = list({comment.subject for comment in approved_comments})
     return result
 
 
@@ -98,7 +98,7 @@ async def get_lecturers(
     Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
 
     `subject`
-    Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с их предметом преподавания.
+    Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с одним из их предметов преподавания.
     Также возвращает всех преподавателей, у которых есть комментарий с совпадающим с данным subject.
     """
     lecturers = Lecturer.query(session=db.session).all()
@@ -132,13 +132,13 @@ async def get_lecturers(
                     lecturer_to_result.mark_clarity,
                 ]
                 lecturer_to_result.mark_general = sum(general_marks) / len(general_marks)
-            if not lecturer_to_result.subject and approved_comments:
-                lecturer_to_result.subject = approved_comments[-1].subject
+            if approved_comments:
+                lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
     if "general" in order_by:
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     if subject:
-        result.lecturers = [lecturer for lecturer in result.lecturers if lecturer.subject == subject]
+        result.lecturers = [lecturer for lecturer in result.lecturers if subject in lecturer.subjects]
     result.total = len(result.lecturers)
     return result
 
