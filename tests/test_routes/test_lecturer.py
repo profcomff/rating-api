@@ -99,7 +99,7 @@ def test_get_lecturer_with_comments(client, dbsession):
     assert json_response["mark_freebie"] == 0.5
     assert json_response["mark_clarity"] == 0.5
     assert json_response["mark_general"] == 0.5
-    assert json_response["subject"] == "Физика"
+    assert "Физика" in json_response["subjects"]
     assert len(json_response["comments"]) != 0
 
 
