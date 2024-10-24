@@ -82,7 +82,7 @@ async def get_comments(
 
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
     """
-    comments = Comment.query(session=db.session).filter(Comment.is_deleted == False).all()
+    comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
@@ -138,7 +138,7 @@ async def delete_comment(
     check_comment = Comment.get(session=db.session, id=uuid)
     if check_comment is None:
         raise ObjectNotFound(Comment, uuid)
-    Comment.update(session=db.session, id=uuid, is_deleted=True)
+    Comment.delete(session=db.session, id=uuid)
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
