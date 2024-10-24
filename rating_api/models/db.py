@@ -34,6 +34,7 @@ class Lecturer(BaseDbModel):
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Comment(BaseDbModel):
@@ -48,6 +49,7 @@ class Comment(BaseDbModel):
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
     lecturer: Mapped[Lecturer] = relationship("Lecturer", back_populates="comments")
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class LecturerUserComment(BaseDbModel):
@@ -56,3 +58,4 @@ class LecturerUserComment(BaseDbModel):
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
