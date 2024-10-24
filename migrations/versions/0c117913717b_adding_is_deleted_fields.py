@@ -6,8 +6,8 @@ Create Date: 2024-10-24 06:59:27.285029
 
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 
 # revision identifiers, used by Alembic.
@@ -18,10 +18,10 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column('comment', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false))
-    op.add_column('lecturer', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false))
+    op.add_column('comment', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false()))
+    op.add_column('lecturer', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false()))
     op.add_column(
-        'lecturer_user_comment', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false)
+        'lecturer_user_comment', sa.Column('is_deleted', sa.Boolean(), nullable=False, server_default=sa.false())
     )
 
 
