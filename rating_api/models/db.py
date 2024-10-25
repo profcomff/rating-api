@@ -46,7 +46,11 @@ class Comment(BaseDbModel):
     mark_kindness: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_freebie: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_clarity: Mapped[int] = mapped_column(Integer, nullable=False)
-    lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
+    lecturer_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("lecturer.id"),
+        primary_join="and_(Comment.lecturer_id==Lecturer.id),not_(Lecturer.is_deleted))",
+    )
     lecturer: Mapped[Lecturer] = relationship("Lecturer", back_populates="comments")
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -54,7 +58,11 @@ class Comment(BaseDbModel):
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
+    lecturer_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("lecturer.id"),
+        primary_join="and_(LecturerUserComment.lecturer_id==Lecturer.id),not_(Lecturer.is_deleted))",
+    )
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
