@@ -33,7 +33,11 @@ class Lecturer(BaseDbModel):
     subject: Mapped[str] = mapped_column(String, nullable=True)
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
-    comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
+    comments: Mapped[list[Comment]] = relationship(
+        "Comment",
+        back_populates="lecturer",
+        primaryjoin="and_(Lecturer.id == Comment.lecturer_id, not_(Comment.is_deleted))",
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
@@ -49,7 +53,7 @@ class Comment(BaseDbModel):
     lecturer_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("lecturer.id"),
-        primary_join="and_(Comment.lecturer_id==Lecturer.id),not_(Lecturer.is_deleted))",
+        primary_join="and_(Comment.lecturer_id==Lecturer.id, not_(Lecturer.is_deleted))",
     )
     lecturer: Mapped[Lecturer] = relationship("Lecturer", back_populates="comments")
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
