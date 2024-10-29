@@ -85,7 +85,8 @@ async def get_comments(
     comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    result = CommentGetAll(limit=limit, offset=offset, total=len(comments), comments=comments)
+    result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
+    result.comments = comments
     if lecturer_id:
         result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
     if unreviewed:
