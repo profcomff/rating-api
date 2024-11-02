@@ -138,7 +138,9 @@ async def get_lecturers(
     if "general" in order_by:
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     if subject:
-        result.lecturers = [lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects]
+        result.lecturers = [
+            lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects
+        ]
     result.total = len(result.lecturers)
     return result
 
