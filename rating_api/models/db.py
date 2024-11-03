@@ -5,7 +5,7 @@ import logging
 import uuid
 from enum import Enum
 
-from sqlalchemy import UUID, Boolean, DateTime
+from sqlalchemy import UUID, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
