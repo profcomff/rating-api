@@ -109,10 +109,12 @@ def test_get_lecturer_with_comments(client, dbsession):
 
 
 def test_get_lecturers_by_name(client, dbsession):
-    body_list = [{"first_name": 'Алиса', "last_name": 'Селезнёва', "middle_name": 'Ивановна', "timetable_id": 0},
-                 {"first_name": 'Марат', "last_name": 'Сельков', "middle_name": 'Анатольевич', "timetable_id": 1},
-                 {"first_name": 'М.', "last_name": 'Измайлов', "middle_name": 'Р.', "timetable_id": 2},
-                 {"first_name": 'Михаил', "last_name": 'Измайлов', "middle_name": 'Ильич', "timetable_id": 3}]
+    body_list = [
+        {"first_name": 'Алиса', "last_name": 'Селезнёва', "middle_name": 'Ивановна', "timetable_id": 0},
+        {"first_name": 'Марат', "last_name": 'Сельков', "middle_name": 'Анатольевич', "timetable_id": 1},
+        {"first_name": 'М.', "last_name": 'Измайлов', "middle_name": 'Р.', "timetable_id": 2},
+        {"first_name": 'Михаил', "last_name": 'Измайлов', "middle_name": 'Ильич', "timetable_id": 3},
+    ]
     lecturer_list: list[Lecturer] = [Lecturer(**body_list[i]) for i in range(4)]
     for lecturer in lecturer_list:
         dbsession.add(lecturer)
