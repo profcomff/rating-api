@@ -13,25 +13,27 @@ def find_similar_lecturers(all_lecturers: list[LecturerGet], name: str) -> list[
     lecturers_similarity: list[(float, LecturerGet)] = []
     for lecturer in all_lecturers:
         similarity_scores: dict[str, float] = {}
+        all_words_matched = True
         for word in name.strip().split():
             if (
-                "last_name" not in similarity_scores
+                similarity_scores.get('last_name') is None
                 and (temp_sim := similarity(lecturer.last_name[: len(word)], word)) >= settings.ACCEPTABLE_SIMILARITY
             ):
                 similarity_scores["last_name"] = temp_sim
-            elif "first_name" not in similarity_scores and (
+            elif similarity_scores.get("first_name") is None and (
                 (temp_sim := similarity(lecturer.first_name[: len(word)], word)) >= settings.ACCEPTABLE_SIMILARITY
-                or (lecturer.first_name[1] == '.' and word[0] == lecturer.first_name[0])
+                or ('.' in lecturer.first_name and word[0] == lecturer.first_name[0])
             ):
                 similarity_scores["first_name"] = temp_sim
-            elif "middle_name" not in similarity_scores and (
+            elif similarity_scores.get("middle_name") is None and (
                 (temp_sim := similarity(lecturer.middle_name[: len(word)], word)) >= settings.ACCEPTABLE_SIMILARITY
-                or (lecturer.middle_name[1] == '.' and word[0] == lecturer.middle_name[0])
+                or ('.' in lecturer.middle_name and word[0] == lecturer.middle_name[0])
             ):
                 similarity_scores["middle_name"] = temp_sim
             else:
+                all_words_matched = False
                 break
-        else:
+        if all_words_matched:
             avg_similarity = (
                 sum(similarity_scores.values()) / len(similarity_scores)
                 if similarity_scores

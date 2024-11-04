@@ -140,14 +140,14 @@ async def get_lecturers(
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
-    if name:
-        result.lecturers = find_similar_lecturers(result.lecturers, name)
     if "general" in order_by:
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     if subject:
         result.lecturers = [
             lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects
         ]
+    if name:
+        result.lecturers = find_similar_lecturers(result.lecturers, name)
     result.total = len(result.lecturers)
     return result
 
