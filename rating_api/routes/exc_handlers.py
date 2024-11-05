@@ -1,7 +1,7 @@
 import starlette.requests
 from starlette.responses import JSONResponse
 
-from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests
+from rating_api.exceptions import AlreadyExists, ForbiddenAction, ObjectNotFound, TooManyCommentRequests, WrongMark
 from rating_api.schemas.base import StatusResponseModel
 
 from .base import app
@@ -32,4 +32,11 @@ async def too_many_comment_handler(req: starlette.requests.Request, exc: Already
 async def forbidden_action_handler(req: starlette.requests.Request, exc: AlreadyExists):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=403
+    )
+
+
+@app.exception_handler(WrongMark)
+async def wrong_mark_handler(req: starlette.requests.Request, exc: WrongMark):
+    return JSONResponse(
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=400
     )
