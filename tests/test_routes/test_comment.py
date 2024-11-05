@@ -62,7 +62,7 @@ def test_post_bad_mark(client, dbsession):
     }
     params = {"lecturer_id": lecturer.id}
     post_response = client.post(url, json=body, params=params)
-    assert post_response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert post_response.status_code == status.HTTP_400_BAD_REQUEST
     dbsession.delete(lecturer)
     dbsession.commit()
 
