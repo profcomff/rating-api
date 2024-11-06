@@ -81,6 +81,7 @@ async def get_lecturers(
     info: list[Literal["comments", "mark"]] = Query(default=[]),
     order_by: list[Literal["general", '']] = Query(default=[]),
     subject: str = Query(''),
+    name: str = Query(''),
     _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
 ) -> LecturerGetAll:
     """
@@ -100,8 +101,11 @@ async def get_lecturers(
     `subject`
     Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с одним из их предметов преподавания.
     Также возвращает всех преподавателей, у которых есть комментарий с совпадающим с данным subject.
+
+    `name`
+    Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
-    lecturers = Lecturer.query(session=db.session).all()
+    lecturers = Lecturer.query(session=db.session).filter(Lecturer.search(name)).all()
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
