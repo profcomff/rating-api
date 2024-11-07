@@ -1,6 +1,9 @@
 import datetime
 from uuid import UUID
 
+from pydantic import field_validator
+
+from rating_api.exceptions import WrongMark
 from rating_api.schemas.base import Base
 
 
@@ -22,6 +25,13 @@ class CommentPost(Base):
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
+
+    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @classmethod
+    def validate_mark(cls, value):
+        if value not in [-2, -1, 0, 1, 2]:
+            raise WrongMark()
+        return value
 
 
 class CommentGetAll(Base):

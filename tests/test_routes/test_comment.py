@@ -47,6 +47,26 @@ def test_create_comment(client, dbsession):
     assert post_response.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_post_bad_mark(client, dbsession):
+    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
+    lecturer: Lecturer = Lecturer(**body)
+    dbsession.add(lecturer)
+    dbsession.commit()
+
+    body = {
+        "subject": "Физика",
+        "text": "Хороший препод",
+        "mark_kindness": 4,
+        "mark_freebie": -2,
+        "mark_clarity": 0,
+    }
+    params = {"lecturer_id": lecturer.id}
+    post_response = client.post(url, json=body, params=params)
+    assert post_response.status_code == status.HTTP_400_BAD_REQUEST
+    dbsession.delete(lecturer)
+    dbsession.commit()
+
+
 def test_get_comment(client, dbsession):
     body = {
         "first_name": 'Иван',
