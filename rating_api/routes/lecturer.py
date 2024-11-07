@@ -36,8 +36,7 @@ async def create_lecturer(
 @lecturer.get("/{id}", response_model=LecturerGet)
 async def get_lecturer(
     id: int,
-    info: list[Literal["comments", "mark"]] = Query(default=[]),
-    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
+    info: list[Literal["comments", "mark"]] = Query(default=[])
 ) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.read"]`
@@ -82,7 +81,6 @@ async def get_lecturers(
     order_by: list[Literal["general", '']] = Query(default=[]),
     subject: str = Query(''),
     name: str = Query(''),
-    _=Depends(UnionAuth(scopes=["rating.lecturer.read"], allow_none=False, auto_error=True)),
 ) -> LecturerGetAll:
     """
     Scopes: `["rating.lecturer.read"]`
