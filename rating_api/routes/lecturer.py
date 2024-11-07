@@ -34,10 +34,7 @@ async def create_lecturer(
 
 
 @lecturer.get("/{id}", response_model=LecturerGet)
-async def get_lecturer(
-    id: int,
-    info: list[Literal["comments", "mark"]] = Query(default=[])
-) -> LecturerGet:
+async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(default=[])) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.read"]`
 
@@ -79,7 +76,8 @@ async def get_lecturers(
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
     order_by: list[Literal["general", '']] = Query(default=[]),
-    subject: str = Query('')
+    subject: str = Query(''),
+    name: str = Query(''),
 ) -> LecturerGetAll:
     """
     Scopes: `["rating.lecturer.read"]`
@@ -98,8 +96,11 @@ async def get_lecturers(
     `subject`
     Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с одним из их предметов преподавания.
     Также возвращает всех преподавателей, у которых есть комментарий с совпадающим с данным subject.
+
+    `name`
+    Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
-    lecturers = Lecturer.query(session=db.session).all()
+    lecturers = Lecturer.query(session=db.session).filter(Lecturer.search(name)).all()
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
@@ -136,7 +137,9 @@ async def get_lecturers(
     if "general" in order_by:
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     if subject:
-        result.lecturers = [lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects]
+        result.lecturers = [
+            lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects
+        ]
     result.total = len(result.lecturers)
     return result
 
