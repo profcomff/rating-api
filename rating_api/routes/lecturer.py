@@ -29,6 +29,7 @@ async def create_lecturer(
     )
     if get_lecturer is None:
         new_lecturer: Lecturer = Lecturer.create(session=db.session, **lecturer_info.model_dump())
+        db.session.commit()
         return LecturerGet.model_validate(new_lecturer)
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
