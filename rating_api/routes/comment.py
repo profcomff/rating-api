@@ -80,7 +80,7 @@ async def get_comments(
     `order_by` - возможное значение `'create_ts'` - возвращается список комментариев отсортированных по времени создания
 
     `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
-    
+
     `user_id` - вернет все комментарии пользователя с конкретным id
 
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
@@ -92,10 +92,10 @@ async def get_comments(
     result.comments = comments
     if lecturer_id:
         result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
-    
+
     if user_id:
         result.comments = [comment for comment in result.comments if comment.user_id == user_id]
-    
+
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
