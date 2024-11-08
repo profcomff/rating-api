@@ -37,6 +37,7 @@ class Lecturer(BaseDbModel):
 
 class Comment(BaseDbModel):
     uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=True)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     subject: Mapped[str] = mapped_column(String, nullable=False)
@@ -52,6 +53,6 @@ class Comment(BaseDbModel):
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=True)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
