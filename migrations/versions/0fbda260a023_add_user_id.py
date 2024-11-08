@@ -19,9 +19,7 @@ depends_on = None
 
 def upgrade():
     op.add_column('comment', sa.Column('user_id', sa.Integer(), nullable=True))
-    op.alter_column('lecturer_user_comment', 'user_id', existing_type=sa.INTEGER(), nullable=True)
 
 
 def downgrade():
-    op.alter_column('lecturer_user_comment', 'user_id', existing_type=sa.INTEGER(), nullable=False)
     op.drop_column('comment', 'user_id')
