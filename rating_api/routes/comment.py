@@ -98,9 +98,9 @@ async def get_comments(
             raise ForbiddenAction(Comment)
     else:
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
-        
+
     result.comments = result.comments[offset : limit + offset]
-    
+
     if "create_ts" in order_by:
         result.comments.sort(key=lambda comment: comment.create_ts)
     result.total = len(result.comments)
