@@ -7,7 +7,7 @@ from enum import Enum
 
 from sqlalchemy import UUID, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, and_, or_, true
+from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -40,8 +40,14 @@ class Lecturer(BaseDbModel):
         response = true
         query = query.split(' ')
         for q in query:
+            q = q.lower()
             response = and_(
-                response, or_(self.first_name.contains(q), self.middle_name.contains(q), self.last_name.contains(q))
+                response,
+                or_(
+                    func.lower(self.first_name).contains(q),
+                    func.lower(self.middle_name).contains(q),
+                    func.lower(self.last_name).contains(q),
+                ),
             )
         return response
 
