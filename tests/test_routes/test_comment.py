@@ -105,7 +105,9 @@ def test_delete_comment(client, dbsession):
     random_uuid = uuid.uuid4()
     response = client.delete(f'{url}/{random_uuid}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    comment = Comment.query(session=dbsession).filter(Comment.uuid == comment.uuid).one_or_none()
-    assert comment is None
+    comment1 = Comment.query(session=dbsession).filter(Comment.uuid == comment.uuid).one_or_none()
+    assert comment1 == None
+    comment.is_deleted = True
+    dbsession.delete(comment)
     dbsession.delete(lecturer)
     dbsession.commit()

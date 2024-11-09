@@ -101,9 +101,18 @@ def test_get_lecturer_with_comments(client, dbsession):
     assert json_response["mark_general"] == 0.5
     assert json_response["subject"] == "Физика"
     assert len(json_response["comments"]) != 0
+    dbsession.delete(comment1)
+    dbsession.delete(comment2)
+    dbsession.delete(comment3)
+    dbsession.delete(lecturer)
+    dbsession.commit()
 
 
 def test_update_lecturer(client, dbsession):
+    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
+    lecturer: Lecturer = Lecturer(**body)
+    dbsession.add(lecturer)
+    dbsession.commit()
     body = {
         "first_name": 'Алексей',
         "last_name": 'Алексеев',
@@ -128,12 +137,22 @@ def test_update_lecturer(client, dbsession):
     assert json_response["first_name"] == 'Иван'
     assert json_response["last_name"] == 'Иванов'
     assert json_response["middle_name"] == "Иванович"
+    db_lecturer: Lecturer = Lecturer.query(session=dbsession).filter(Lecturer.timetable_id == 0).one_or_none()
+    dbsession.delete(db_lecturer)
+    dbsession.commit()
 
 
 def test_delete_lecturer(client, dbsession):
+    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
+    lecturer: Lecturer = Lecturer(**body)
+    dbsession.add(lecturer)
+    dbsession.commit()
     lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert lecturer is not None
+    assert not lecturer is None
     response = client.delete(f"{url}/{lecturer.id}")
     assert response.status_code == status.HTTP_200_OK
     response = client.delete(f"{url}/{lecturer.id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+    lecturer.is_deleted = True
+    dbsession.delete(lecturer)
+    dbsession.commit()

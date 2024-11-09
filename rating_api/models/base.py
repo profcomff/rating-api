@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import Integer, not_
+from sqlalchemy import not_
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.orm import Mapped, Query, Session, as_declarative, declared_attr, mapped_column
+from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
 
 from rating_api.exceptions import ObjectNotFound
 
