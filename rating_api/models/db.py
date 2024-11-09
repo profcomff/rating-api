@@ -5,9 +5,10 @@ import logging
 import uuid
 from enum import Enum
 
-from sqlalchemy import UUID, Boolean, DateTime
+from sqlalchemy import UUID, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, String, and_, or_, true
+from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from rating_api.settings import get_settings
@@ -30,7 +31,6 @@ class Lecturer(BaseDbModel):
     first_name: Mapped[str] = mapped_column(String, nullable=False)
     last_name: Mapped[str] = mapped_column(String, nullable=False)
     middle_name: Mapped[str] = mapped_column(String, nullable=False)
-    subject: Mapped[str] = mapped_column(String, nullable=True)
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     comments: Mapped[list[Comment]] = relationship(
@@ -40,9 +40,20 @@ class Lecturer(BaseDbModel):
     )
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    @hybrid_method
+    def search(self, query: str) -> bool:
+        response = true
+        query = query.split(' ')
+        for q in query:
+            response = and_(
+                response, or_(self.first_name.contains(q), self.middle_name.contains(q), self.last_name.contains(q))
+            )
+        return response
+
 
 class Comment(BaseDbModel):
     uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=True)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     subject: Mapped[str] = mapped_column(String, nullable=False)

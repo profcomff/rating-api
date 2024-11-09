@@ -1,11 +1,15 @@
 import datetime
 from uuid import UUID
 
+from pydantic import field_validator
+
+from rating_api.exceptions import WrongMark
 from rating_api.schemas.base import Base
 
 
 class CommentGet(Base):
     uuid: UUID
+    user_id: int
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str
@@ -22,6 +26,13 @@ class CommentPost(Base):
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
+
+    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @classmethod
+    def validate_mark(cls, value):
+        if value not in [-2, -1, 0, 1, 2]:
+            raise WrongMark()
+        return value
 
 
 class CommentGetAll(Base):
@@ -42,7 +53,7 @@ class LecturerGet(Base):
     last_name: str
     middle_name: str
     avatar_link: str | None = None
-    subject: str | None = None
+    subjects: list[str] | None = None
     timetable_id: int
     mark_kindness: float | None = None
     mark_freebie: float | None = None
@@ -62,7 +73,6 @@ class LecturerPost(Base):
     first_name: str
     last_name: str
     middle_name: str
-    subject: str | None = None
     avatar_link: str | None = None
     timetable_id: int
 
@@ -71,6 +81,5 @@ class LecturerPatch(Base):
     first_name: str | None = None
     last_name: str | None = None
     middle_name: str | None = None
-    subject: str | None = None
     avatar_link: str | None = None
     timetable_id: int | None = None
