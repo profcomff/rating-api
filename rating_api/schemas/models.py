@@ -9,7 +9,7 @@ from rating_api.schemas.base import Base
 
 class CommentGet(Base):
     uuid: UUID
-    user_id: int
+    user_id: int | None
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str
