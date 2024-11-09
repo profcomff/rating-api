@@ -41,8 +41,14 @@ class Lecturer(BaseDbModel):
         response = true
         query = query.split(' ')
         for q in query:
+            q = q.lower()
             response = and_(
-                response, or_(self.first_name.contains(q), self.middle_name.contains(q), self.last_name.contains(q))
+                response,
+                or_(
+                    func.lower(self.first_name).contains(q),
+                    func.lower(self.middle_name).contains(q),
+                    func.lower(self.last_name).contains(q),
+                ),
             )
         return response
 
