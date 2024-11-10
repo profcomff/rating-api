@@ -7,7 +7,7 @@ from enum import Enum
 
 from sqlalchemy import UUID, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
+from sqlalchemy import ForeignKey, Integer, String, Boolean, and_, func, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -33,8 +33,8 @@ class Lecturer(BaseDbModel):
     middle_name: Mapped[str] = mapped_column(String, nullable=False)
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
-    comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
-    is_deleted: Mapped[bool] = False
+    comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer", cascade="all, delete-orphan")
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_method
     def search_by_name(self, query: str) -> bool:
@@ -72,7 +72,7 @@ class Comment(BaseDbModel):
         primaryjoin="and_(Comment.lecturer_id == Lecturer.id, not_(Lecturer.is_deleted))",
     )
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
-    is_deleted: Mapped[bool] = False
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
 
 class LecturerUserComment(BaseDbModel):
@@ -81,4 +81,4 @@ class LecturerUserComment(BaseDbModel):
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    is_deleted: Mapped[bool] = False
+    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
