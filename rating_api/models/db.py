@@ -34,6 +34,7 @@ class Lecturer(BaseDbModel):
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
+    is_deleted: Mapped[bool] = False
 
     @hybrid_method
     def search_by_name(self, query: str) -> bool:
@@ -65,8 +66,13 @@ class Comment(BaseDbModel):
     mark_freebie: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_clarity: Mapped[int] = mapped_column(Integer, nullable=False)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
-    lecturer: Mapped[Lecturer] = relationship("Lecturer", back_populates="comments")
+    lecturer: Mapped[Lecturer] = relationship(
+        "Lecturer",
+        back_populates="comments",
+        primaryjoin="and_(Comment.lecturer_id == Lecturer.id, not_(Lecturer.is_deleted))",
+    )
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+    is_deleted: Mapped[bool] = False
 
 
 class LecturerUserComment(BaseDbModel):
@@ -75,3 +81,4 @@ class LecturerUserComment(BaseDbModel):
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    is_deleted: Mapped[bool] = False
