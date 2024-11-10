@@ -7,7 +7,7 @@ from enum import Enum
 
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, Boolean, and_, func, or_, true
+from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

@@ -20,7 +20,6 @@ class CommentGet(Base):
     lecturer_id: int
 
 
-
 class CommentPost(Base):
     subject: str
     text: str
