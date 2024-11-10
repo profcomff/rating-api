@@ -77,7 +77,8 @@ async def get_lecturers(
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
     order_by: list[Literal["general", '']] = Query(default=[]),
-    subject: str = Query('')
+    subject: str = Query(''),
+    name: str = Query(''),
 ) -> LecturerGetAll:
     """
     Scopes: `["rating.lecturer.read"]`
