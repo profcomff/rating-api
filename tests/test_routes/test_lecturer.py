@@ -200,3 +200,8 @@ def test_delete_lecturer(client, dbsession):
     assert response.status_code == status.HTTP_200_OK
     response = client.delete(f"{url}/{lecturer.id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+    lecturer.is_deleted = True
+    comment.is_deleted = True
+    dbsession.delete(comment)
+    dbsession.delete(lecturer)
+    dbsession.commit()

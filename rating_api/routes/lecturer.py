@@ -99,9 +99,9 @@ async def get_lecturers(
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
-    lecturers_query = Lecturer.query(session=db.session)
     lecturers_query = (
-        lecturers_query.outerjoin(Lecturer.comments)
+        Lecturer.query(session=db.session)
+        .outerjoin(Lecturer.comments)
         .group_by(Lecturer.id)
         .filter(Lecturer.search_by_subject(subject))
         .filter(Lecturer.search_by_name(name))
