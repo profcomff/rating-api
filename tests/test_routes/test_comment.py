@@ -88,6 +88,7 @@ def test_get_comment(client, comment):
 =======
     comment = Comment.query(session=dbsession).filter(Comment.uuid == response_comment.json()["uuid"]).one_or_none()
     assert comment is not None
+    dbsession.delete(comment)
     dbsession.delete(lecturer)
     dbsession.commit()
 >>>>>>> 3efd622 (tests fix)
