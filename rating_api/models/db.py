@@ -33,7 +33,7 @@ class Lecturer(BaseDbModel):
     middle_name: Mapped[str] = mapped_column(String, nullable=False)
     avatar_link: Mapped[str] = mapped_column(String, nullable=True)
     timetable_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
-    comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer", cascade="all, delete-orphan")
+    comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_method
