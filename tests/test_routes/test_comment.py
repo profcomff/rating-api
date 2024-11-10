@@ -84,6 +84,13 @@ def test_get_comment(client, comment):
     random_uuid = uuid.uuid4()
     response = client.get(f'{url}/{random_uuid}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
+<<<<<<< HEAD
+=======
+    comment = Comment.query(session=dbsession).filter(Comment.uuid == response_comment.json()["uuid"]).one_or_none()
+    assert comment is not None
+    dbsession.delete(lecturer)
+    dbsession.commit()
+>>>>>>> 3efd622 (tests fix)
 
 
 @pytest.mark.parametrize(
