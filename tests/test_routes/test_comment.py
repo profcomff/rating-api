@@ -97,7 +97,6 @@ def test_get_comment(client, dbsession):
     assert response.status_code == status.HTTP_404_NOT_FOUND
     comment = Comment.query(session=dbsession).filter(Comment.uuid == response_comment.json()["uuid"]).one_or_none()
     assert comment is not None
-    dbsession.delete(comment)
     dbsession.delete(lecturer)
     dbsession.commit()
 
@@ -122,6 +121,8 @@ def test_delete_comment(client, dbsession):
     dbsession.commit()
     response = client.delete(f'{url}/{comment.uuid}')
     assert response.status_code == status.HTTP_200_OK
+    response = client.get(f'{url}/{comment.uuid}')
+    assert response.status_code == status.HTTP_404_NOT_FOUND
     random_uuid = uuid.uuid4()
     response = client.delete(f'{url}/{random_uuid}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
