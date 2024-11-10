@@ -7,7 +7,7 @@ from enum import Enum
 
 from sqlalchemy import UUID, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, and_, or_, true
+from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,13 +36,21 @@ class Lecturer(BaseDbModel):
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
 
     @hybrid_method
-    def search(self, query: str) -> bool:
+    def search_by_name(self, query: str) -> bool:
         response = true
         query = query.split(' ')
         for q in query:
             response = and_(
                 response, or_(self.first_name.contains(q), self.middle_name.contains(q), self.last_name.contains(q))
             )
+        return response
+
+    @hybrid_method
+    def search_by_subject(self, query: str) -> bool:
+        query = query.lower()
+        response = true
+        if query:
+            response = and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
         return response
 
 

@@ -101,7 +101,11 @@ async def get_lecturers(
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
-    lecturers = Lecturer.query(session=db.session).filter(Lecturer.search(name)).all()
+    lecturers_query = Lecturer.query(session=db.session)
+    if subject:
+        lecturers_query = lecturers_query.join(Lecturer.comments).filter(Lecturer.search_by_subject(subject))
+    lecturers_query = lecturers_query.filter(Lecturer.search_by_name(name))
+    lecturers = lecturers_query.all()
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
@@ -137,11 +141,6 @@ async def get_lecturers(
         result.lecturers.append(lecturer_to_result)
     if "general" in order_by:
         result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
-    if subject:
-        result.lecturers = [
-            lecturer for lecturer in result.lecturers if lecturer.subjects and subject in lecturer.subjects
-        ]
-    result.total = len(result.lecturers)
     return result
 
 
