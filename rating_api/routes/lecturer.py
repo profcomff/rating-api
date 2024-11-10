@@ -3,7 +3,7 @@ from typing import Literal
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import and_
+from sqlalchemy import and_, func, nullslast
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
@@ -76,19 +76,17 @@ async def get_lecturers(
     limit: int = 10,
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
-    order_by: list[Literal["general", '']] = Query(default=[]),
+    order_by: list[Literal["alphabet", '']] = Query(default=[]),
     subject: str = Query(''),
     name: str = Query(''),
 ) -> LecturerGetAll:
     """
-    Scopes: `["rating.lecturer.read"]`
-
     `limit` - максимальное количество возвращаемых преподавателей
 
     `offset` - нижняя граница получения преподавателей, т.е. если по дефолту первым возвращается преподаватель с условным номером N, то при наличии ненулевого offset будет возвращаться преподаватель с номером N + offset
 
-    `order_by` - возможные значения `'general'`.
-    Если передано `'general'` - возвращается список преподавателей отсортированных по общей оценке
+    `order_by` - возможные значения `'alphabet'`.
+    Если передано `'alphabet'` - возвращается список преподавателей отсортированных по алфавиту
 
     `info` - возможные значения `'comments'`, `'mark'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
@@ -102,14 +100,26 @@ async def get_lecturers(
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
     lecturers_query = Lecturer.query(session=db.session)
-    if subject:
-        lecturers_query = lecturers_query.join(Lecturer.comments).filter(Lecturer.search_by_subject(subject))
-    lecturers_query = lecturers_query.filter(Lecturer.search_by_name(name))
-    lecturers = lecturers_query.all()
+    lecturers_query = (
+        lecturers_query.outerjoin(Lecturer.comments)
+        .group_by(Lecturer.id)
+        .filter(Lecturer.search_by_subject(subject))
+        .filter(Lecturer.search_by_name(name))
+    )
+    if "alphabet" in order_by:
+        lecturers_query = lecturers_query.order_by(Lecturer.last_name)
+    else:
+        lecturers_query = lecturers_query.order_by(
+            nullslast(func.avg((Comment.mark_kindness + Comment.mark_freebie + Comment.mark_clarity) / 3).desc())
+        )
+
+    lecturers = lecturers_query.offset(offset).limit(limit).all()
+    lecturers_count = lecturers_query.group_by(Lecturer.id).count()
+
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
-    result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
-    for db_lecturer in lecturers[offset : limit + offset]:
+    result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
+    for db_lecturer in lecturers:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
         if db_lecturer.comments:
@@ -139,8 +149,6 @@ async def get_lecturers(
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
-    if "general" in order_by:
-        result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     return result
 
 
