@@ -72,6 +72,5 @@ class Comment(BaseDbModel):
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
