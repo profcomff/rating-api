@@ -49,8 +49,8 @@ class Lecturer(BaseDbModel):
     def search_by_subject(self, query: str) -> bool:
         query = query.lower()
         response = true
-        if query != "":
-            response = and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject) == query)
+        if query:
+            response = and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
         return response
 
 
