@@ -101,13 +101,11 @@ async def get_lecturers(
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
     """
-    lecturers = (
-        Lecturer.query(session=db.session)
-        .join(Lecturer.comments)
-        .filter(Lecturer.search_by_name(name))
-        .filter(Lecturer.search_by_subject(subject))
-        .all()
-    )
+    lecturers_query = Lecturer.query(session=db.session)
+    if subject:
+        lecturers_query = lecturers_query.join(Lecturer.comments).filter(Lecturer.search_by_subject(subject))
+    lecturers_query = lecturers_query.filter(Lecturer.search_by_name(name))
+    lecturers = lecturers_query.all()
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
