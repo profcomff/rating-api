@@ -61,11 +61,10 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
         if "comments" in info and approved_comments:
             result.comments = approved_comments
         if "mark" in info and approved_comments:
-            result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(approved_comments)
+            result.mark_freebie = sum(comment.mark_freebie for comment in approved_comments) / len(approved_comments)
             result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(approved_comments)
             result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
-            general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
-            result.mark_general = sum(general_marks) / len(general_marks)
+            result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(approved_comments)
         if approved_comments:
             result.subjects = list({comment.subject for comment in approved_comments})
     return result
@@ -142,12 +141,9 @@ async def get_lecturers(
                 lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
                     approved_comments
                 )
-                general_marks = [
-                    lecturer_to_result.mark_freebie,
-                    lecturer_to_result.mark_kindness,
-                    lecturer_to_result.mark_clarity,
-                ]
-                lecturer_to_result.mark_general = sum(general_marks) / len(general_marks)
+                lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
+                    approved_comments
+                )
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
