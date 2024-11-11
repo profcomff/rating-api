@@ -2,10 +2,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
 from rating_api.models.db import *
 from rating_api.routes import app
 from rating_api.settings import Settings
-from rating_api.utils.utils import random_string, random_mark
+from rating_api.utils.utils import random_mark, random_string
 
 
 @pytest.fixture

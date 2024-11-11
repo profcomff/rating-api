@@ -1,7 +1,8 @@
 import logging
 
-from starlette import status
 import pytest
+from starlette import status
+
 from rating_api.models import Comment, Lecturer, ReviewStatus
 from rating_api.settings import get_settings
 
