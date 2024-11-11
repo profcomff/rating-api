@@ -76,7 +76,9 @@ async def get_lecturers(
     limit: int = 10,
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
-    order_by: list[Literal["alphabet", '']] = Query(default=[]),
+    order_by: str = Query(
+        enum=["mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"], default="mark_general"
+    ),
     subject: str = Query(''),
     name: str = Query(''),
 ) -> LecturerGetAll:
@@ -105,13 +107,12 @@ async def get_lecturers(
         .group_by(Lecturer.id)
         .filter(Lecturer.search_by_subject(subject))
         .filter(Lecturer.search_by_name(name))
-    )
-    if "alphabet" in order_by:
-        lecturers_query = lecturers_query.order_by(Lecturer.last_name)
-    else:
-        lecturers_query = lecturers_query.order_by(
-            nullslast(func.avg((Comment.mark_kindness + Comment.mark_freebie + Comment.mark_clarity) / 3).desc())
+        .order_by(
+            nullslast(func.avg(getattr(Comment, order_by)).desc())
+            if "mark" in order_by
+            else getattr(Lecturer, order_by)
         )
+    )
 
     lecturers = lecturers_query.offset(offset).limit(limit).all()
     lecturers_count = lecturers_query.group_by(Lecturer.id).count()

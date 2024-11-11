@@ -8,7 +8,7 @@ from enum import Enum
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
-from sqlalchemy.ext.hybrid import hybrid_method
+from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from rating_api.settings import get_settings
@@ -73,6 +73,10 @@ class Comment(BaseDbModel):
     )
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    @hybrid_property
+    def mark_general(self):
+        return (self.mark_kindness + self.mark_freebie + self.mark_clarity) / 3
 
 
 class LecturerUserComment(BaseDbModel):
