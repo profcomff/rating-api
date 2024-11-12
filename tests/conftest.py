@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from rating_api.models.db import *
 from rating_api.routes import app
 from rating_api.settings import Settings
-from rating_api.utils.utils import random_mark, random_string
 
 
 @pytest.fixture
@@ -29,87 +28,110 @@ def dbsession() -> Session:
     settings = Settings()
     engine = create_engine(str(settings.DB_DSN), pool_pre_ping=True)
     TestingSessionLocal = sessionmaker(bind=engine)
-    yield TestingSessionLocal()
+    session = TestingSessionLocal()
+    yield session
 
 
 @pytest.fixture
 def lecturer(dbsession):
-    """
-    Вызов фабрики создает препода и возвращает его
-    ```
-    def test(lecturer):
-        lecturer1 = lecturer()
-        lecturer2 = lecturer()
-    ```
-    """
-    lecturers = []
-
-    def _lecturer(first_name: str | None = None, last_name: str | None = None, middle_name: str | None = None):
-        nonlocal lecturers
-        first_name = f"test_fname{random_string()}" if first_name is None else first_name
-        last_name = f"test_lname{random_string()}" if last_name is None else last_name
-        middle_name = f"test_mname{random_string()}" if middle_name is None else middle_name
-        __lecturer = Lecturer(
-            first_name=first_name, last_name=last_name, middle_name=middle_name, timetable_id=len(lecturers)
-        )
-        dbsession.add(__lecturer)
-        dbsession.commit()
-        lecturers.append(__lecturer)
-        return __lecturer
-
-    yield _lecturer
-    dbsession.expire_all()
+    _lecturer = Lecturer(first_name="test_fname", last_name="test_lname", middle_name="test_mname", timetable_id=0)
+    dbsession.add(_lecturer)
     dbsession.commit()
-    for row in lecturers:
-        dbsession.delete(row)
+    yield _lecturer
+    dbsession.refresh(_lecturer)
+    dbsession.delete(_lecturer)
     dbsession.commit()
 
 
 @pytest.fixture
 def comment(dbsession, lecturer):
-    """ "
-    Вызов фабрики создает комментарий к преподавателю и возвращает его
-    ```
-    def test(comment):
-        comment1 = comment()
-        comment2 = comment()
-    ```
-    """
-    comments = []
+    _comment = Comment(
+        subject="test_subject",
+        text="test_comment",
+        mark_kindness=1,
+        mark_clarity=1,
+        mark_freebie=1,
+        lecturer_id=lecturer.id,
+        review_status=ReviewStatus.APPROVED,
+    )
+    dbsession.add(_comment)
+    dbsession.commit()
+    yield _comment
+    dbsession.refresh(_comment)
+    dbsession.delete(_comment)
+    dbsession.commit()
 
-    def _comment(
-        lecturer_id: int | None = None,
-        user_id: int | None = None,
-        review_status: ReviewStatus = ReviewStatus.APPROVED,
-        subject: str | None = None,
-    ):
-        nonlocal comments
-        text = random_string()
-        subject = random_string() if subject is None else subject
-        mark_kindness = random_mark()
-        mark_freebie = random_mark()
-        mark_clarity = random_mark()
-        if lecturer_id is None:
-            lecturer = lecturer()
-            lecturer_id = lecturer.id
-        __comment = Comment(
+
+@pytest.fixture(scope='function')
+def lecturers(dbsession):
+    """
+    Creates 4 lecturers(one with flag is_deleted=True)
+    """
+    lecturers_data = [
+        ("test_fname1", "test_lname1", "test_mname1", 0),
+        ("test_fname2", "test_lname2", "test_mname2", 1),
+        ("Bibka", "Bobka", "Bobkovich", 2),
+    ]
+
+    lecturers = [
+        Lecturer(first_name=fname, last_name=lname, middle_name=mname, timetable_id=timetable_id)
+        for fname, lname, mname, timetable_id in lecturers_data
+    ]
+    lecturers.append(
+        Lecturer(first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=3)
+    )
+    lecturers[-1].is_deleted = True
+    for lecturer in lecturers:
+        dbsession.add(lecturer)
+    dbsession.commit()
+    yield lecturers
+    for lecturer in lecturers:
+        dbsession.refresh(lecturer)
+        for row in lecturer.comments:
+            dbsession.delete(row)
+        lecturer_user_comments = dbsession.query(LecturerUserComment).filter(
+            LecturerUserComment.lecturer_id == lecturer.id
+        )
+        for row in lecturer_user_comments:
+            dbsession.delete(row)
+        dbsession.delete(lecturer)
+    dbsession.commit()
+
+
+@pytest.fixture
+def lecturers_with_comments(dbsession, lecturers):
+    """
+    Creates 4 lecturers(one with flag is_deleted=True) with 3 comments to non-deleted lecturers 2 approved and one dismissed. Two of them have alike names.
+    """
+    comments_data = [
+        (lecturers[0].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
+        (lecturers[0].id, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
+        (lecturers[1].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
+        (lecturers[1].id, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
+        (lecturers[2].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[2].id, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
+    ]
+
+    comments = [
+        Comment(
             subject=subject,
-            text=text,
+            text="test_comment",
             mark_kindness=mark_kindness,
             mark_clarity=mark_clarity,
             mark_freebie=mark_freebie,
             lecturer_id=lecturer_id,
-            user_id=user_id,
             review_status=review_status,
         )
-        dbsession.add(__comment)
-        dbsession.commit()
-        comments.append(__comment)
-        return __comment
+        for lecturer_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data
+    ]
 
-    yield _comment
-    dbsession.expire_all()
+    dbsession.add_all(comments)
     dbsession.commit()
-    for row in comments:
-        dbsession.delete(row)
+    yield lecturers, comments
+    for comment in comments:
+        dbsession.refresh(comment)
+        dbsession.delete(comment)
     dbsession.commit()
