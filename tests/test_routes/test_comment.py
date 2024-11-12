@@ -64,7 +64,7 @@ settings = get_settings()
     ],
 )
 def test_create_comment(client, dbsession, lecturers, body, timetable_id, response_status):
-    params = {"lecturer_id": lecturers[timetable_id].id}  # Ensure we get the ID of the lecturer
+    params = {"lecturer_id": lecturers[timetable_id].id}
     post_response = client.post(url, json=body, params=params)
     assert post_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
