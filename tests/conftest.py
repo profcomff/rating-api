@@ -62,6 +62,25 @@ def comment(dbsession, lecturer):
     dbsession.commit()
 
 
+@pytest.fixture
+def unreviewed_comment(dbsession, lecturer):
+    _comment = Comment(
+        subject="test_subject",
+        text="test_comment",
+        mark_kindness=1,
+        mark_clarity=1,
+        mark_freebie=1,
+        lecturer_id=lecturer.id,
+        review_status=ReviewStatus.PENDING,
+    )
+    dbsession.add(_comment)
+    dbsession.commit()
+    yield _comment
+    dbsession.refresh(_comment)
+    dbsession.delete(_comment)
+    dbsession.commit()
+
+
 @pytest.fixture(scope='function')
 def lecturers(dbsession):
     """
@@ -101,18 +120,23 @@ def lecturers(dbsession):
 @pytest.fixture
 def lecturers_with_comments(dbsession, lecturers):
     """
-    Creates 4 lecturers(one with flag is_deleted=True) with 3 comments to non-deleted lecturers 2 approved and one dismissed. Two of them have alike names.
+    Creates 4 lecturers(one with flag is_deleted=True)
+      with 4 comments to non-deleted lecturers 2 approved and one dismissed and one pending.
+        Two of them have alike names.
     """
     comments_data = [
-        (lecturers[0].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[0].id, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
-        (lecturers[0].id, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
-        (lecturers[1].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[1].id, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
-        (lecturers[1].id, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
-        (lecturers[2].id, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[2].id, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
-        (lecturers[2].id, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
+        (lecturers[0].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, None, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
+        (lecturers[0].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
+        (lecturers[0].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[1].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, None, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
+        (lecturers[1].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
+        (lecturers[1].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[2].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, None, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[2].id, 0, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
+        (lecturers[2].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
     ]
 
     comments = [
@@ -123,9 +147,10 @@ def lecturers_with_comments(dbsession, lecturers):
             mark_clarity=mark_clarity,
             mark_freebie=mark_freebie,
             lecturer_id=lecturer_id,
+            user_id=user_id,
             review_status=review_status,
         )
-        for lecturer_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data
+        for lecturer_id, user_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data
     ]
 
     dbsession.add_all(comments)
