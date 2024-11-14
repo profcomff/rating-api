@@ -104,6 +104,23 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, timetable_id, 
         )
 
 
+@pytest.mark.parametrize(
+    'review_status, response_status',
+    [
+        ("approved", status.HTTP_200_OK),
+        ("dismissed", status.HTTP_200_OK),
+        ("wrong_status", status.HTTP_422_UNPROCESSABLE_ENTITY),
+    ],
+)
+def test_review_comment(client, dbsession, unreviewed_comment, review_status, response_status):
+    query = {"review_status": review_status}
+    response = client.patch(f"{url}/{unreviewed_comment.uuid}", params=query)
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        dbsession.refresh(unreviewed_comment)
+        assert unreviewed_comment.review_status == ReviewStatus(review_status)
+
+
 def test_delete_comment(client, dbsession, comment):
     response = client.delete(f'{url}/{comment.uuid}')
     assert response.status_code == status.HTTP_200_OK
