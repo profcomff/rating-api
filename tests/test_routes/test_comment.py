@@ -54,12 +54,12 @@ settings = get_settings()
             {
                 "subject": "test_subject",
                 "text": "test_text",
-                "mark_kindness": 5,
+                "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
             },
             3,
-            status.HTTP_400_BAD_REQUEST,
+            status.HTTP_404_NOT_FOUND,
         ),
     ],
 )
