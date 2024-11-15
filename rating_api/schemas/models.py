@@ -23,6 +23,8 @@ class CommentGet(Base):
 class CommentPost(Base):
     subject: str
     text: str
+    create_ts: datetime.datetime | None = None
+    update_ts: datetime.datetime | None = None
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
