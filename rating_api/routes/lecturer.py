@@ -121,21 +121,20 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
-                lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
-                    approved_comments
-                )
+                result.mark_freebie, result.mark_kindness, result.mark_clarity = 0, 0, 0
+
+                for comment in approved_comments:
+                    result.mark_freebie += comment.mark_freebie
+                    result.mark_kindness += comment.mark_kindness
+                    result.mark_clarity += comment.mark_clarity
+
                 general_marks = [
-                    lecturer_to_result.mark_freebie,
-                    lecturer_to_result.mark_kindness,
-                    lecturer_to_result.mark_clarity,
+                    result.mark_freebie / len(approved_comments),
+                    result.mark_kindness / len(approved_comments),
+                    result.mark_clarity / len(approved_comments),
                 ]
-                lecturer_to_result.mark_general = sum(general_marks) / len(general_marks)
+                result.mark_general = sum(general_marks) / len(general_marks)
+
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
