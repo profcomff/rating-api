@@ -34,7 +34,7 @@ def dbsession() -> Session:
 
 @pytest.fixture
 def lecturer(dbsession):
-    _lecturer = Lecturer(first_name="test_fname", last_name="test_lname", middle_name="test_mname", timetable_id=0)
+    _lecturer = Lecturer(first_name="test_fname", last_name="test_lname", middle_name="test_mname", timetable_id=9900)
     dbsession.add(_lecturer)
     dbsession.commit()
     yield _lecturer
@@ -87,9 +87,9 @@ def lecturers(dbsession):
     Creates 4 lecturers(one with flag is_deleted=True)
     """
     lecturers_data = [
-        ("test_fname1", "test_lname1", "test_mname1", 0),
-        ("test_fname2", "test_lname2", "test_mname2", 1),
-        ("Bibka", "Bobka", "Bobkovich", 2),
+        ("test_fname1", "test_lname1", "test_mname1", 9900),
+        ("test_fname2", "test_lname2", "test_mname2", 9901),
+        ("Bibka", "Bobka", "Bobkovich", 9902),
     ]
 
     lecturers = [

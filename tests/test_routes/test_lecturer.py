@@ -29,7 +29,7 @@ def test_create_lecturer(client, dbsession, response_status):
 
 
 @pytest.mark.parametrize(
-    'timetable_id,response_status',
+    'lecturer_n,response_status',
     [
         (0, status.HTTP_200_OK),
         (1, status.HTTP_200_OK),
@@ -37,8 +37,10 @@ def test_create_lecturer(client, dbsession, response_status):
         (3, status.HTTP_404_NOT_FOUND),
     ],
 )
-def test_get_lecturer(client, dbsession, lecturers, timetable_id, response_status):
-    lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == timetable_id).one_or_none()
+def test_get_lecturer(client, dbsession, lecturers, lecturer_n, response_status):
+    lecturer = (
+        dbsession.query(Lecturer).filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id).one_or_none()
+    )
     # check non-existing id request
     lecturer_id = -1
     if lecturer:
@@ -55,24 +57,24 @@ def test_get_lecturer(client, dbsession, lecturers, timetable_id, response_statu
 
 
 @pytest.mark.parametrize(
-    'timetable_id,mark_kindness,mark_freebie,mark_clarity,mark_general',
+    'lecturer_n,mark_kindness,mark_freebie,mark_clarity,mark_general',
     [(0, 1.5, 1.5, 1.5, 1.5), (1, 0, 0, 0, 0), (2, 0.5, 0.5, 0.5, 0.5)],
 )
 def test_get_lecturer_with_comments(
-    client, lecturers_with_comments, timetable_id, mark_kindness, mark_freebie, mark_clarity, mark_general
+    client, lecturers_with_comments, lecturer_n, mark_kindness, mark_freebie, mark_clarity, mark_general
 ):
     lecturers, comments = lecturers_with_comments
     query = {"info": ['comments', 'mark']}
-    response = client.get(f'{url}/{lecturers[timetable_id].id}', params=query)
+    response = client.get(f'{url}/{lecturers[lecturer_n].id}', params=query)
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
     assert json_response["mark_kindness"] == mark_kindness
     assert json_response["mark_freebie"] == mark_freebie
     assert json_response["mark_clarity"] == mark_clarity
     assert json_response["mark_general"] == mark_general
-    assert "test_subject" in json_response["subjects"]
-    assert "test_subject1" in json_response["subjects"]
-    assert "test_subject2" not in json_response["subjects"]
+    assert comments[lecturer_n * 4 + 0].subject in json_response["subjects"]
+    assert comments[lecturer_n * 4 + 1].subject in json_response["subjects"]
+    assert comments[lecturer_n * 4 + 2].subject not in json_response["subjects"]
     assert len(json_response["comments"]) == 2
 
 
@@ -80,6 +82,7 @@ def test_get_lecturer_with_comments(
     'query,total,response_status',
     [
         ({'name': 'test_lname1'}, 1, status.HTTP_200_OK),
+        ({'name': 'TeSt_LnAmE1'}, 1, status.HTTP_200_OK),
         ({'name': 'test'}, 2, status.HTTP_200_OK),
         ({'name': 'testlname123'}, 0, status.HTTP_404_NOT_FOUND),
     ],
@@ -126,9 +129,9 @@ def test_update_lecturer(client, lecturer, body, response_status):
     response = client.get(f'{url}/{lecturer.id}')
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
-    assert json_response['first_name'] == 'test_fname'
-    assert json_response['last_name'] == 'test_lname'
-    assert json_response['middle_name'] == 'test_mname'
+    assert json_response['first_name'] == lecturer.first_name
+    assert json_response['last_name'] == lecturer.last_name
+    assert json_response['middle_name'] == lecturer.middle_name
     response = client.patch(f"{url}/{lecturer.id}", json=body)
     assert response.status_code == response_status
     if response_status == status.HTTP_200_OK:
