@@ -40,7 +40,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                 - datetime.datetime.utcnow()
             )
 
-    # Сначала добавляем с user_id, который мы получили при авторизации, 
+    # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
 
@@ -49,11 +49,14 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         user_id = None if comment_info.is_anonymous == True else user.get('id')
         del comment_info.is_anonymous
     else:
-        user_id=user.get('id')
-    
+        user_id = user.get('id')
+
     new_comment = Comment.create(
-        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id,
-        user_id=user_id, review_status=ReviewStatus.PENDING
+        session=db.session,
+        **comment_info.model_dump(),
+        lecturer_id=lecturer_id,
+        user_id=user_id,
+        review_status=ReviewStatus.PENDING,
     )
     return CommentGet.model_validate(new_comment)
 
@@ -137,8 +140,8 @@ async def review_comment(
     check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
-    
-    #if user.get('id') == Comment.user_id and 'rating.comment.selfupdate' in user.scopes:
+
+    # if user.get('id') == Comment.user_id and 'rating.comment.selfupdate' in user.scopes:
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
