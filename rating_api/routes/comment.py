@@ -40,9 +40,20 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                 - datetime.datetime.utcnow()
             )
 
+    # Сначала добавляем с user_id, который мы получили при авторизации, 
+    # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+
+    # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
+    if hasattr(comment_info, 'is_anonymous'):
+        user_id = None if comment_info.is_anonymous == True else user.get('id')
+        del comment_info.is_anonymous
+    else:
+        user_id=user.get('id')
+    
     new_comment = Comment.create(
-        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id, user_id=user.get('id'), review_status=ReviewStatus.PENDING
+        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id,
+        user_id=user_id, review_status=ReviewStatus.PENDING
     )
     return CommentGet.model_validate(new_comment)
 
