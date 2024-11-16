@@ -23,36 +23,39 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Scopes: `["rating.comment.review"]`
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
+
+    Скоуп нужен для создания комментариев с заданым timestamp
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
 
+    current_time = datetime.datetime.utcnow()
     if comment_info.create_ts or comment_info.update_ts:
-        if not "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+        if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
             raise ForbiddenAction(Comment)
         else:
             if not comment_info.create_ts:
-                comment_info.create_ts = datetime.datetime.utcnow()
+                comment_info.create_ts = current_time
             if not comment_info.update_ts:
-                comment_info.update_ts = datetime.datetime.utcnow()
+                comment_info.update_ts = current_time
     else:
-        comment_info.create_ts = datetime.datetime.utcnow()
-        comment_info.update_ts = datetime.datetime.utcnow()
+        comment_info.create_ts = current_time
+        comment_info.update_ts = current_time
 
     user_comments: list[LecturerUserComment] = (
         LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
     )
 
-    if not "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+    if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
         for user_comment in user_comments:
-            if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
+            if current_time - user_comment.update_ts < datetime.timedelta(
                 minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
             ):
                 raise TooManyCommentRequests(
                     dtime=user_comment.update_ts
                     + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                    - datetime.datetime.utcnow()
+                    - current_time
                 )
 
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
