@@ -42,7 +42,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
     new_comment = Comment.create(
-        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id, review_status=ReviewStatus.PENDING
+        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id, user_id=user.get('id'), review_status=ReviewStatus.PENDING
     )
     return CommentGet.model_validate(new_comment)
 
@@ -112,7 +112,7 @@ async def get_comments(
 async def review_comment(
     uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
-    _=Depends(UnionAuth(scopes=["rating.comment.review"], allow_none=False, auto_error=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], allow_none=False, auto_error=True)),
 ) -> CommentGet:
     """
     Scopes: `["rating.comment.review"]`
@@ -122,9 +122,13 @@ async def review_comment(
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
     """
+
     check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
+    
+    #if user.get('id') == Comment.user_id and 'rating.comment.selfupdate' in user.scopes:
+
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
 
