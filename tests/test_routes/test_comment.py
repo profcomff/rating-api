@@ -98,7 +98,7 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
-        )
+        ),
     ],
 )
 def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
@@ -108,12 +108,12 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
         assert comment is not None
-        
+
         if "create_ts" in body:
             assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
         if "update_ts" in body:
             assert comment.update_ts == datetime.datetime.fromisoformat(body["update_ts"]).replace(tzinfo=None)
-            
+
         user_comment = (
             LecturerUserComment.query(session=dbsession)
             .filter(LecturerUserComment.lecturer_id == lecturers[lecturer_n].id)
