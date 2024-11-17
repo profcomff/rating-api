@@ -31,8 +31,9 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ObjectNotFound(Lecturer, lecturer_id)
 
     current_time = datetime.datetime.utcnow()
+    has_review_scope = "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]
     if comment_info.create_ts or comment_info.update_ts:
-        if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
+        if not has_review_scope:
             raise ForbiddenAction(Comment)
         else:
             if not comment_info.create_ts:
@@ -47,7 +48,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
     )
 
-    if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
+    if not has_review_scope:
         for user_comment in user_comments:
             if current_time - user_comment.update_ts < datetime.timedelta(
                 minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
