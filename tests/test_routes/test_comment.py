@@ -4,7 +4,7 @@ import uuid
 import pytest
 from starlette import status
 
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, LecturerUserComment, ReviewStatus
 from rating_api.settings import get_settings
 
 
@@ -24,7 +24,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
-                "is_anonymous": False
+                "is_anonymous": False,
             },
             0,
             status.HTTP_200_OK,
@@ -36,7 +36,7 @@ settings = get_settings()
                 "mark_kindness": -2,
                 "mark_freebie": -2,
                 "mark_clarity": -2,
-                "is_anonymous": False
+                "is_anonymous": False,
             },
             1,
             status.HTTP_200_OK,
@@ -48,7 +48,7 @@ settings = get_settings()
                 "mark_kindness": 5,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False
+                "is_anonymous": False,
             },
             2,
             status.HTTP_400_BAD_REQUEST,
@@ -60,7 +60,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False
+                "is_anonymous": False,
             },
             3,
             status.HTTP_404_NOT_FOUND,
@@ -72,7 +72,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": True
+                "is_anonymous": True,
             },
             0,
             status.HTTP_200_OK,
@@ -84,7 +84,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False
+                "is_anonymous": False,
             },
             0,
             status.HTTP_200_OK,
@@ -96,7 +96,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": 'asd'
+                "is_anonymous": 'asd',
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -108,7 +108,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": 'asd'
+                "is_anonymous": 'asd',
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
