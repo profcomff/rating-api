@@ -129,14 +129,20 @@ def lecturers_with_comments(dbsession, lecturers):
         (lecturers[0].id, None, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
         (lecturers[0].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
         (lecturers[0].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[0].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, 2, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
         (lecturers[1].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
         (lecturers[1].id, None, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
         (lecturers[1].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
         (lecturers[1].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[1].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, 2, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
         (lecturers[2].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
         (lecturers[2].id, None, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
         (lecturers[2].id, 0, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
         (lecturers[2].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[2].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, 2, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
     ]
 
     comments = [

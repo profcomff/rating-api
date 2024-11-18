@@ -72,10 +72,10 @@ def test_get_lecturer_with_comments(
     assert json_response["mark_freebie"] == mark_freebie
     assert json_response["mark_clarity"] == mark_clarity
     assert json_response["mark_general"] == mark_general
-    assert comments[lecturer_n * 4 + 0].subject in json_response["subjects"]
-    assert comments[lecturer_n * 4 + 1].subject in json_response["subjects"]
-    assert comments[lecturer_n * 4 + 2].subject not in json_response["subjects"]
-    assert len(json_response["comments"]) == 2
+    assert comments[lecturer_n * 6 + 0].subject in json_response["subjects"]
+    assert comments[lecturer_n * 6 + 1].subject in json_response["subjects"]
+    assert comments[lecturer_n * 6 + 2].subject not in json_response["subjects"]
+    assert len(json_response["comments"]) == 4
 
 
 @pytest.mark.parametrize(
