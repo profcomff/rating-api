@@ -99,6 +99,18 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
+        (  # wrong date
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "create_ts": "wasd",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
     ],
 )
 def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
