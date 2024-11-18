@@ -34,7 +34,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     has_review_scope = "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]
     if (comment_info.create_ts or comment_info.update_ts) and not has_review_scope:
         raise ForbiddenAction(Comment)
-        
+
     if not comment_info.create_ts:
         comment_info.create_ts = current_time
     if not comment_info.update_ts:
