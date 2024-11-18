@@ -121,28 +121,29 @@ def lecturers(dbsession):
 def lecturers_with_comments(dbsession, lecturers):
     """
     Creates 4 lecturers(one with flag is_deleted=True)
-      with 4 comments to non-deleted lecturers 2 approved and one dismissed and one pending.
+      with 6 comments to non-deleted lecturers 4 approved and one dismissed and one pending.
         Two of them have alike names.
+        Two of them have a different user_id.
     """
     comments_data = [
         (lecturers[0].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
         (lecturers[0].id, None, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
         (lecturers[0].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
         (lecturers[0].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[0].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[0].id, 2, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
+        (lecturers[0].id, 1, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, 2, 'test_subject12', ReviewStatus.APPROVED, 2, 2, 2),
         (lecturers[1].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
         (lecturers[1].id, None, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
         (lecturers[1].id, 0, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
         (lecturers[1].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[1].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[1].id, 2, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
+        (lecturers[1].id, 1, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, 2, 'test_subject12', ReviewStatus.APPROVED, -1, -1, -1),
         (lecturers[2].id, 0, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
         (lecturers[2].id, None, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
         (lecturers[2].id, 0, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
         (lecturers[2].id, 0, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[2].id, 1, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[2].id, 2, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[2].id, 1, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, 2, 'test_subject12', ReviewStatus.APPROVED, 0, 0, 0),
     ]
 
     comments = [
