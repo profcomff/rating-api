@@ -7,9 +7,10 @@ from enum import Enum
 
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, and_, func, or_, true
+from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from rating_api.settings import get_settings
 
@@ -59,6 +60,18 @@ class Lecturer(BaseDbModel):
         if query:
             response = and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
         return response
+
+    @hybrid_method
+    def order_by_mark(self, query: str, asc_order: bool) -> UnaryExpression[float]:
+        return (
+            nulls_last(func.avg(getattr(Comment, query)))
+            if asc_order
+            else nulls_last(func.avg(getattr(Comment, query)).desc())
+        )
+
+    @hybrid_method
+    def order_by_name(self, query: str, asc_order: bool) -> UnaryExpression[str] | InstrumentedAttribute[str]:
+        return getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()
 
 
 class Comment(BaseDbModel):

@@ -3,7 +3,7 @@ from typing import Literal
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import and_, func, nulls_last
+from sqlalchemy import and_
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
@@ -80,6 +80,7 @@ async def get_lecturers(
     ),
     subject: str = Query(''),
     name: str = Query(''),
+    asc_order: bool = False,
 ) -> LecturerGetAll:
     """
     `limit` - максимальное количество возвращаемых преподавателей
@@ -100,6 +101,10 @@ async def get_lecturers(
 
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
+
+    `asc_order`
+    Если передано true, сортировать в порядке возрастания
+    Иначе - в порядке убывания
     """
     lecturers_query = (
         Lecturer.query(session=db.session)
@@ -108,9 +113,9 @@ async def get_lecturers(
         .filter(Lecturer.search_by_subject(subject))
         .filter(Lecturer.search_by_name(name))
         .order_by(
-            nulls_last(func.avg(getattr(Comment, order_by)).desc())
+            Lecturer.order_by_mark(order_by, asc_order)
             if "mark" in order_by
-            else getattr(Lecturer, order_by)
+            else Lecturer.order_by_name(order_by, asc_order)
         )
     )
 
