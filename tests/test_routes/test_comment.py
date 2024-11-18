@@ -103,6 +103,7 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
             ]
         )
 
+
 @pytest.mark.parametrize(
     'user_id,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)]
 )
@@ -116,9 +117,12 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
             [
                 comment
                 for comment in comments
-                if comment.user_id == user_id and comment.review_status == ReviewStatus.APPROVED and not comment.is_deleted
+                if comment.user_id == user_id
+                and comment.review_status == ReviewStatus.APPROVED
+                and not comment.is_deleted
             ]
         )
+
 
 @pytest.mark.parametrize(
     'review_status, response_status,is_reviewed',
