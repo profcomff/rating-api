@@ -3,7 +3,7 @@ from typing import Literal
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import and_, func, nullslast
+from sqlalchemy import and_, func, nulls_last
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
@@ -108,7 +108,7 @@ async def get_lecturers(
         .filter(Lecturer.search_by_subject(subject))
         .filter(Lecturer.search_by_name(name))
         .order_by(
-            nullslast(func.avg(getattr(Comment, order_by)).desc())
+            nulls_last(func.avg(getattr(Comment, order_by)).desc())
             if "mark" in order_by
             else getattr(Lecturer, order_by)
         )
