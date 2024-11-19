@@ -31,6 +31,17 @@ settings = get_settings()
         ),
         (
             {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
                 "subject": "test1_subject",
                 "text": "test_text",
                 "mark_kindness": -2,
