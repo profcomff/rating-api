@@ -26,6 +26,7 @@ class CommentPost(Base):
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
+    is_anonymous: bool
 
     @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
     @classmethod
