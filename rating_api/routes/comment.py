@@ -24,21 +24,20 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
 
-    Скоуп нужен для создания комментариев с заданым timestamp
+    Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.review"]
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
 
-    current_time = datetime.datetime.utcnow()
     has_review_scope = "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]
     if (comment_info.create_ts or comment_info.update_ts) and not has_review_scope:
         raise ForbiddenAction(Comment)
 
     if not comment_info.create_ts:
-        comment_info.create_ts = current_time
+        comment_info.create_ts = datetime.datetime.utcnow()
     if not comment_info.update_ts:
-        comment_info.update_ts = current_time
+        comment_info.update_ts = datetime.datetime.utcnow()
 
     user_comments: list[LecturerUserComment] = (
         LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
@@ -46,13 +45,13 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     if not has_review_scope:
         for user_comment in user_comments:
-            if current_time - user_comment.update_ts < datetime.timedelta(
+            if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
                 minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
             ):
                 raise TooManyCommentRequests(
                     dtime=user_comment.update_ts
                     + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                    - current_time
+                    - datetime.datetime.utcnow()
                 )
 
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
