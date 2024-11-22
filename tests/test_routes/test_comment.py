@@ -18,19 +18,7 @@ settings = get_settings()
     'body,lecturer_n,response_status',
     [
         (
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "mark_kindness": 1,
-                "mark_freebie": 0,
-                "mark_clarity": 0,
-                "is_anonymous": False,
-            },
-            0,
-            status.HTTP_200_OK,
-        ),
-        (
-            {
+            { 
                 "subject": "test_subject",
                 "text": "test_text",
                 "mark_kindness": 1,
@@ -42,12 +30,22 @@ settings = get_settings()
         ),
         (
             {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            { 
                 "subject": "test1_subject",
                 "text": "test_text",
                 "mark_kindness": -2,
                 "mark_freebie": -2,
                 "mark_clarity": -2,
-                "is_anonymous": False,
             },
             1,
             status.HTTP_200_OK,
@@ -59,7 +57,6 @@ settings = get_settings()
                 "mark_kindness": 5,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False,
             },
             2,
             status.HTTP_400_BAD_REQUEST,
@@ -71,7 +68,6 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False,
             },
             3,
             status.HTTP_404_NOT_FOUND,
@@ -88,6 +84,17 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
+        (
+            { # Not provided anonymity
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            1,
+            status.HTTP_200_OK,
+        ),
         (  # NotAnonymous comment
             {
                 "subject": "test_subject",
@@ -101,18 +108,6 @@ settings = get_settings()
             status.HTTP_200_OK,
         ),
         (  # Bad anonymity
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "mark_kindness": 1,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
-                "is_anonymous": 'asd',
-            },
-            0,
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
-        ),
-        (  # Not provided anonymity
             {
                 "subject": "test_subject",
                 "text": "test_text",
