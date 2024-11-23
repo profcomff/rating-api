@@ -80,6 +80,7 @@ def unreviewed_comment(dbsession, lecturer):
     dbsession.delete(_comment)
     dbsession.commit()
 
+
 @pytest.fixture
 def comment_update(dbsession, lecturer):
     _comment = Comment(
@@ -90,7 +91,7 @@ def comment_update(dbsession, lecturer):
         mark_freebie=1,
         lecturer_id=lecturer.id,
         review_status=ReviewStatus.APPROVED,
-        user_id=0
+        user_id=0,
     )
     dbsession.add(_comment)
     dbsession.commit()
@@ -98,6 +99,7 @@ def comment_update(dbsession, lecturer):
     dbsession.refresh(_comment)
     dbsession.delete(_comment)
     dbsession.commit()
+
 
 @pytest.fixture(scope='function')
 def lecturers(dbsession):
