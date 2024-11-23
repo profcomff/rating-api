@@ -183,6 +183,42 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
         assert commment_to_reivew.review_status == ReviewStatus(review_status)
 
 
+@pytest.mark.parametrize('body, response_status',
+                         [
+                            (
+                                {"subject": "test_subject", "text": "test_text", "mark_kindness": 0, "mark_freebie": -2, "mark_clarity": 0,},
+                                status.HTTP_200_OK
+                            ),
+                            (
+                                {"subject": 0, "text": "test_text", "mark_kindness": 0, "mark_freebie": -2, "mark_clarity": 0,},
+                                status.HTTP_422_UNPROCESSABLE_ENTITY
+                            ),
+                            (
+                                {"subject": "test_subject", "mark_kindness": 0, "mark_freebie": -2, "mark_clarity": 0,},
+                                status.HTTP_422_UNPROCESSABLE_ENTITY
+                            ),
+                            (
+                                {"subject": "test_subject", "text": "test_text", "mark_kindness": 5, "mark_freebie": -2, "mark_clarity": 0,},
+                                status.HTTP_400_BAD_REQUEST
+                            ),
+                            (#Ошибка для анонимных комментариев
+                                {"subject": "test_subject", "text": "test_text", "mark_kindness": 0, "mark_freebie": -2, "mark_clarity": 0, "is_anonymous": True},
+                                status.HTTP_200_OK
+                            ),
+                         ])
+def test_update_comment(client, dbsession, comment_update, body, response_status):
+    response = client.patch(f"{url}/{comment_update.uuid}", json=body)
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        dbsession.refresh(comment_update)
+        assert comment_update.review_status == ReviewStatus.PENDING
+
+    #Проверям, что мы изменяем только те комментарии, у которых user_id пользователя и не null
+    if "is_anonymous" in body and body['is_anonymous']:
+        response = client.patch(f"{url}/{comment_update.uuid}", json=body)
+        assert response.status_code == 403
+
+
 def test_delete_comment(client, dbsession, comment):
     response = client.delete(f'{url}/{comment.uuid}')
     assert response.status_code == status.HTTP_200_OK

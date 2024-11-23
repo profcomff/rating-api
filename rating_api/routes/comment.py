@@ -153,7 +153,10 @@ async def update_comment(uuid: UUID,
     if comment.user_id != user.get("id"):
         raise ForbiddenAction(Comment)
 
-    return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, **comment_update.model_dump(), update_ts=datetime.datetime.utcnow(),review_status=ReviewStatus.PENDING))
+    # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
+    user_id = None if comment_update.is_anonymous else comment.user_id
+    
+    return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, **comment_update.model_dump(exclude={"is_anonymous"}), user_id=user_id, update_ts=datetime.datetime.utcnow(), review_status=ReviewStatus.PENDING))
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
