@@ -176,7 +176,7 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
 def test_review_comment(client, dbsession, unreviewed_comment, comment, review_status, response_status, is_reviewed):
     commment_to_reivew = comment if is_reviewed else unreviewed_comment
     query = {"review_status": review_status}
-    response = client.patch(f"{url}/{commment_to_reivew.uuid}", params=query)
+    response = client.patch(f"{url}/{commment_to_reivew.uuid}/review", params=query)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
         dbsession.refresh(commment_to_reivew)
