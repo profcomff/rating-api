@@ -118,7 +118,7 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
@@ -139,6 +139,21 @@ async def review_comment(
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
+
+@comment.patch("/{uuid}", response_model=CommentGet)
+async def update_comment(uuid: UUID, 
+                         comment_update: CommentPost = None, 
+                         user=Depends(UnionAuth())) -> CommentGet:
+    """
+    Изменить комментарий только свой неанонимный.
+    Должны быть переданы все поля в теле запроса: оценки, предмет, текст. Их можно получить из GET и изменить нужное, остальное оставить
+    """
+    comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
+    
+    if comment.user_id != user.get("id"):
+        raise ForbiddenAction(Comment)
+
+    return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, **comment_update.model_dump(), update_ts=datetime.datetime.utcnow(),review_status=ReviewStatus.PENDING))
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
