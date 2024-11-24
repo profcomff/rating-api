@@ -17,6 +17,7 @@ class CommentGet(Base):
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
+    mark_general: float
     lecturer_id: int
 
 
