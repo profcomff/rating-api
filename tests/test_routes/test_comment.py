@@ -1,3 +1,4 @@
+import datetime
 import logging
 import uuid
 
@@ -72,6 +73,19 @@ settings = get_settings()
             3,
             status.HTTP_404_NOT_FOUND,
         ),
+        (
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "create_ts": "2077-11-16T19:15:27.306Z",
+                "update_ts": "2077-11-16T19:15:27.306Z",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
         (  # Anonymous comment
             {
                 "subject": "test_subject",
@@ -85,14 +99,15 @@ settings = get_settings()
             status.HTTP_200_OK,
         ),
         (
-            {  # Not provided anonymity
+            {
                 "subject": "test_subject",
                 "text": "test_text",
+                "update_ts": "2077-11-16T19:15:27.306Z",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
             },
-            1,
+            0,
             status.HTTP_200_OK,
         ),
         (  # NotAnonymous comment
@@ -107,7 +122,43 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
+        (
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "create_ts": "2077-11-16T19:15:27.306Z",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (  # wrong date
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "create_ts": "wasd",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
         (  # Bad anonymity
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "create_ts": "wasd",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+        (  # Not provided anonymity
             {
                 "subject": "test_subject",
                 "text": "test_text",
@@ -128,6 +179,12 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
         assert comment is not None
+
+        if "create_ts" in body:
+            assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
+        if "update_ts" in body:
+            assert comment.update_ts == datetime.datetime.fromisoformat(body["update_ts"]).replace(tzinfo=None)
+
         user_comment = (
             LecturerUserComment.query(session=dbsession)
             .filter(LecturerUserComment.lecturer_id == lecturers[lecturer_n].id)
@@ -158,6 +215,26 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
                 comment
                 for comment in lecturers[lecturer_n].comments
                 if comment.review_status == ReviewStatus.APPROVED and not comment.is_deleted
+            ]
+        )
+
+
+@pytest.mark.parametrize(
+    'user_id,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)]
+)
+def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_status):
+    _, comments = lecturers_with_comments
+    response = response = client.get(f'{url}', params={"user_id": user_id})
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        json_response = response.json()
+        assert len(json_response["comments"]) == len(
+            [
+                comment
+                for comment in comments
+                if comment.user_id == user_id
+                and comment.review_status == ReviewStatus.APPROVED
+                and not comment.is_deleted
             ]
         )
 
