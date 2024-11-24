@@ -20,17 +20,17 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
-    Scopes: `["rating.comment.create"]`
+    Scopes: `["rating.comment.import"]`
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
 
-    Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.create"]
+    Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
 
-    has_create_scope = "rating.comment.create" in [scope['name'] for scope in user.get('session_scopes')]
+    has_create_scope = "rating.comment.import" in [scope['name'] for scope in user.get('session_scopes')]
     if (comment_info.create_ts or comment_info.update_ts) and not has_create_scope:
         raise ForbiddenAction(Comment)
 
