@@ -5,7 +5,7 @@ import uuid
 import pytest
 from starlette import status
 
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, LecturerUserComment, ReviewStatus
 from rating_api.settings import get_settings
 
 
@@ -25,6 +25,18 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
+                "is_anonymous": False,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
             },
             0,
             status.HTTP_200_OK,
@@ -36,6 +48,7 @@ settings = get_settings()
                 "mark_kindness": -2,
                 "mark_freebie": -2,
                 "mark_clarity": -2,
+                "is_anonymous": False,
             },
             1,
             status.HTTP_200_OK,
@@ -47,6 +60,7 @@ settings = get_settings()
                 "mark_kindness": 5,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
+                "is_anonymous": False,
             },
             2,
             status.HTTP_400_BAD_REQUEST,
@@ -58,6 +72,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
+                "is_anonymous": False,
             },
             3,
             status.HTTP_404_NOT_FOUND,
@@ -75,6 +90,19 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
+        (  # Anonymous comment
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+                "is_anonymous": True,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+
         (
             {
                 "subject": "test_subject",
@@ -83,6 +111,18 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (  # NotAnonymous comment
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+                "is_anonymous": False,
             },
             0,
             status.HTTP_200_OK,
@@ -107,6 +147,30 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+        (  # Bad anonymity
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+                "is_anonymous": 'asd',
+            },
+            0,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+        (  # Not provided anonymity
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 1,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+                "is_anonymous": 'asd',
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -156,6 +220,26 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
                 comment
                 for comment in lecturers[lecturer_n].comments
                 if comment.review_status == ReviewStatus.APPROVED and not comment.is_deleted
+            ]
+        )
+
+
+@pytest.mark.parametrize(
+    'user_id,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)]
+)
+def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_status):
+    _, comments = lecturers_with_comments
+    response = response = client.get(f'{url}', params={"user_id": user_id})
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        json_response = response.json()
+        assert len(json_response["comments"]) == len(
+            [
+                comment
+                for comment in comments
+                if comment.user_id == user_id
+                and comment.review_status == ReviewStatus.APPROVED
+                and not comment.is_deleted
             ]
         )
 

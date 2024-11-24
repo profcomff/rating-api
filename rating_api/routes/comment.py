@@ -49,9 +49,19 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                     - datetime.datetime.utcnow()
                 )
 
+    # Сначала добавляем с user_id, который мы получили при авторизации,
+    # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
     LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+
+    # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
+    user_id = None if comment_info.is_anonymous else user.get('id')
+
     new_comment = Comment.create(
-        session=db.session, **comment_info.model_dump(), lecturer_id=lecturer_id, review_status=ReviewStatus.PENDING
+        session=db.session,
+        **comment_info.model_dump(exclude={"is_anonymous"}),
+        lecturer_id=lecturer_id,
+        user_id=user_id,
+        review_status=ReviewStatus.PENDING,
     )
     return CommentGet.model_validate(new_comment)
 
@@ -72,6 +82,7 @@ async def get_comments(
     limit: int = 10,
     offset: int = 0,
     lecturer_id: int | None = None,
+    user_id: int | None = None,
     order_by: list[Literal["create_ts"]] = Query(default=[]),
     unreviewed: bool = False,
     user=Depends(UnionAuth(scopes=['rating.comment.review'], auto_error=False, allow_none=True)),
@@ -89,6 +100,8 @@ async def get_comments(
 
     `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
 
+    `user_id` - вернет все комментарии пользователя с конкретным id
+
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
     """
     comments = Comment.query(session=db.session).all()
@@ -96,8 +109,12 @@ async def get_comments(
         raise ObjectNotFound(Comment, 'all')
     result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
     result.comments = comments
-    if lecturer_id:
+    if user_id is not None:
+        result.comments = [comment for comment in result.comments if comment.user_id == user_id]
+
+    if lecturer_id is not None:
         result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
+
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
@@ -131,9 +148,11 @@ async def review_comment(
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
     """
+
     check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
+
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
 
