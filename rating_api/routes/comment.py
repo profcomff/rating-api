@@ -9,7 +9,7 @@ from fastapi_sqlalchemy import db
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost, CommentUpdate
 from rating_api.settings import Settings, get_settings
 
 
@@ -141,25 +141,19 @@ async def review_comment(
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)
-async def update_comment(uuid: UUID, comment_update: CommentPost = None, user=Depends(UnionAuth())) -> CommentGet:
-    """
-    Изменить комментарий только свой неанонимный.
-    Должны быть переданы все поля в теле запроса: оценки, предмет, текст. Их можно получить из GET и изменить нужное, остальное оставить
-    """
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+    """Позволяет изменить свой неанонимный комментарий. любое поле опционально,"""
     comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
 
-    if comment.user_id != user.get("id"):
+    if comment.user_id != user.get("id") or comment.user_id is None:
         raise ForbiddenAction(Comment)
-
-    # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
-    user_id = None if comment_update.is_anonymous else comment.user_id
 
     return CommentGet.model_validate(
         Comment.update(
             session=db.session,
             id=uuid,
-            **comment_update.model_dump(exclude={"is_anonymous"}),
-            user_id=user_id,
+            # Исключаем атрибуты, котрые не переданы
+            **comment_update.model_dump(exclude=set(k for k, v in comment_update if v is None)),
             update_ts=datetime.datetime.utcnow(),
             review_status=ReviewStatus.PENDING,
         )

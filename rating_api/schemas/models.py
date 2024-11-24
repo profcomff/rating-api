@@ -36,6 +36,21 @@ class CommentPost(Base):
         return value
 
 
+class CommentUpdate(Base):
+    subject: str | None = None
+    text: str | None = None
+    mark_kindness: int | None = None
+    mark_freebie: int | None = None
+    mark_clarity: int | None = None
+
+    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @classmethod
+    def validate_mark(cls, value):
+        if value not in [-2, -1, 0, 1, 2]:
+            raise WrongMark()
+        return value
+
+
 class CommentGetAll(Base):
     comments: list[CommentGet] = []
     limit: int

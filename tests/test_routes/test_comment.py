@@ -206,14 +206,14 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
             },
             status.HTTP_422_UNPROCESSABLE_ENTITY,
         ),
-        (
+        (  # Отсутсвует одно поле
             {
                 "subject": "test_subject",
                 "mark_kindness": 0,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
             },
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_200_OK,
         ),
         (
             {
@@ -225,14 +225,12 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
             },
             status.HTTP_400_BAD_REQUEST,
         ),
-        (  # Ошибка для анонимных комментариев
+        (  # Отсутсвует все поля
             {
                 "subject": "test_subject",
-                "text": "test_text",
                 "mark_kindness": 0,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": True,
             },
             status.HTTP_200_OK,
         ),
@@ -244,11 +242,6 @@ def test_update_comment(client, dbsession, comment_update, body, response_status
     if response.status_code == status.HTTP_200_OK:
         dbsession.refresh(comment_update)
         assert comment_update.review_status == ReviewStatus.PENDING
-
-    # Проверям, что мы изменяем только те комментарии, у которых user_id пользователя и не null
-    if "is_anonymous" in body and body['is_anonymous']:
-        response = client.patch(f"{url}/{comment_update.uuid}", json=body)
-        assert response.status_code == 403
 
 
 def test_delete_comment(client, dbsession, comment):
