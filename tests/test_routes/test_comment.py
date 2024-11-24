@@ -168,6 +168,26 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
 
 
 @pytest.mark.parametrize(
+    'user_id,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)]
+)
+def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_status):
+    _, comments = lecturers_with_comments
+    response = response = client.get(f'{url}', params={"user_id": user_id})
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        json_response = response.json()
+        assert len(json_response["comments"]) == len(
+            [
+                comment
+                for comment in comments
+                if comment.user_id == user_id
+                and comment.review_status == ReviewStatus.APPROVED
+                and not comment.is_deleted
+            ]
+        )
+
+
+@pytest.mark.parametrize(
     'review_status, response_status,is_reviewed',
     [
         ("approved", status.HTTP_200_OK, True),
