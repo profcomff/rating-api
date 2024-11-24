@@ -303,12 +303,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
             status.HTTP_400_BAD_REQUEST,
         ),
         (  # Отсутсвует все поля
-            {
-                "subject": "test_subject",
-                "mark_kindness": 0,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
-            },
+            {},
             status.HTTP_200_OK,
         ),
     ],
