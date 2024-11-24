@@ -102,7 +102,6 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-
         (
             {
                 "subject": "test_subject",
