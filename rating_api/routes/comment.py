@@ -168,7 +168,7 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
             session=db.session,
             id=uuid,
             # Исключаем атрибуты, котрые не переданы
-            **comment_update.model_dump(exclude=set(k for k, v in comment_update if v is None)),
+            **comment_update.model_dump(exclude_unset=True),
             update_ts=datetime.datetime.utcnow(),
             review_status=ReviewStatus.PENDING,
         )
