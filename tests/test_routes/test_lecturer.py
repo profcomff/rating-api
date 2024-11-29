@@ -1,8 +1,9 @@
 import logging
 
+import pytest
 from starlette import status
 
-from rating_api.models import Comment, Lecturer, ReviewStatus
+from rating_api.models import Lecturer
 from rating_api.settings import get_settings
 
 
@@ -12,196 +13,149 @@ url: str = '/lecturer'
 settings = get_settings()
 
 
-def test_create_lecturer(client, dbsession):
+@pytest.mark.parametrize('response_status', [status.HTTP_200_OK, status.HTTP_409_CONFLICT])
+def test_create_lecturer(client, dbsession, response_status):
     body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
     post_response = client.post(url, json=body)
-    assert post_response.status_code == status.HTTP_200_OK
-    check_same_response = client.post(url, json=body)
-    assert check_same_response.status_code == status.HTTP_409_CONFLICT
-    lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert lecturer is not None
-    dbsession.delete(lecturer)
-    dbsession.commit()
-    lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert lecturer is None
-
-
-def test_get_lecturer(client, dbsession):
-    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
-    lecturer: Lecturer = Lecturer(**body)
-    dbsession.add(lecturer)
-    dbsession.commit()
-    db_lecturer: Lecturer = Lecturer.query(session=dbsession).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert db_lecturer is not None
-    get_response = client.get(f'{url}/{db_lecturer.id}')
-    print(get_response.json())
-    assert get_response.status_code == status.HTTP_200_OK
-    json_response = get_response.json()
-    assert json_response["mark_kindness"] is None
-    assert json_response["mark_freebie"] is None
-    assert json_response["mark_clarity"] is None
-    assert json_response["mark_general"] is None
-    assert json_response["comments"] is None
-    dbsession.delete(lecturer)
-    dbsession.commit()
-
-
-def test_get_lecturer_with_comments(client, dbsession):
-    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
-    lecturer: Lecturer = Lecturer(**body)
-    dbsession.add(lecturer)
-    dbsession.commit()
-    db_lecturer: Lecturer = Lecturer.query(session=dbsession).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert db_lecturer is not None
-
-    comment1: dict = {
-        "subject": "Физика",
-        "text": "Хороший преподаватель",
-        "mark_kindness": 2,
-        "mark_freebie": 0,
-        "mark_clarity": 2,
-        "lecturer_id": db_lecturer.id,
-        "review_status": ReviewStatus.APPROVED,
-    }
-    comment2: dict = {
-        "subject": "Физика",
-        "text": "Средне",
-        "mark_kindness": -1,
-        "mark_freebie": 1,
-        "mark_clarity": -1,
-        "lecturer_id": db_lecturer.id,
-        "review_status": ReviewStatus.APPROVED,
-    }
-    comment3: dict = {
-        "subject": "Физика",
-        "text": "Средне",
-        "mark_kindness": 2,
-        "mark_freebie": 2,
-        "mark_clarity": 2,
-        "lecturer_id": db_lecturer.id,
-        "review_status": ReviewStatus.PENDING,
-    }
-    comment1: Comment = Comment.create(session=dbsession, **comment1)
-    comment2: Comment = Comment.create(session=dbsession, **comment2)
-    comment3: Comment = Comment.create(session=dbsession, **comment3)
-    dbsession.commit()
-    assert comment1 is not None
-    assert comment2 is not None
-    assert comment3 is not None
-    query = {
-        "info": ['comments', 'mark'],
-    }
-    response = client.get(f'{url}/{db_lecturer.id}', params=query)
-    print(response.json())
-    assert response.status_code == status.HTTP_200_OK
-    json_response = response.json()
-    assert json_response["mark_kindness"] == 0.5
-    assert json_response["mark_freebie"] == 0.5
-    assert json_response["mark_clarity"] == 0.5
-    assert json_response["mark_general"] == 0.5
-    assert "Физика" in json_response["subjects"]
-    assert len(json_response["comments"]) != 0
-    dbsession.delete(comment1)
-    dbsession.delete(comment2)
-    dbsession.delete(comment3)
-    dbsession.delete(lecturer)
-    dbsession.commit()
-
-
-def test_get_lecturers_by_name(client, dbsession):
-    body_list = [
-        {"first_name": 'Алиса', "last_name": 'Селезнёва', "middle_name": 'Ивановна', "timetable_id": 0},
-        {"first_name": 'Марат', "last_name": 'Сельков', "middle_name": 'Анатольевич', "timetable_id": 1},
-        {"first_name": 'М.', "last_name": 'Измайлов', "middle_name": 'Р.', "timetable_id": 2},
-        {"first_name": 'Михаил', "last_name": 'Измайлов', "middle_name": 'Ильич', "timetable_id": 3},
-    ]
-    lecturer_list: list[Lecturer] = [Lecturer(**body_list[i]) for i in range(4)]
-    for lecturer in lecturer_list:
-        dbsession.add(lecturer)
-    dbsession.commit()
-    db_lecturer: Lecturer = Lecturer.query(session=dbsession).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert db_lecturer is not None
-    query = {"name": "Селезнёва"}
-    get_response = client.get(f'{url}', params=query)
-    assert get_response.status_code == status.HTTP_200_OK
-    json_response = get_response.json()
-    assert json_response["total"] == 1
-    assert json_response["lecturers"][0]["first_name"] == "Алиса"
-
-    query = {"name": "Сел"}
-    get_response = client.get(f'{url}', params=query)
-    assert get_response.status_code == status.HTTP_200_OK
-    json_response = get_response.json()
-    assert json_response["total"] == 2
-    assert json_response["lecturers"][0]["first_name"] == "Алиса"
-    assert json_response["lecturers"][1]["first_name"] == "Марат"
-
-    query = {"name": "Измайлова"}
-    get_response = client.get(f'{url}', params=query)
-    assert get_response.status_code == status.HTTP_404_NOT_FOUND
-
-    for lecturer in lecturer_list:
+    assert post_response.status_code == response_status
+    # cleanup on a last run
+    if response_status == status.HTTP_409_CONFLICT:
+        lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        assert lecturer is not None
         dbsession.delete(lecturer)
-    dbsession.commit()
+        dbsession.commit()
+        lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        assert lecturer is None
 
 
-def test_update_lecturer(client, dbsession):
-    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
-    lecturer: Lecturer = Lecturer(**body)
-    dbsession.add(lecturer)
-    dbsession.commit()
-    body = {
-        "first_name": 'Алексей',
-        "last_name": 'Алексеев',
-        "middle_name": 'Алексеевич',
-    }
-    db_lecturer: Lecturer = Lecturer.query(session=dbsession).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert db_lecturer is not None
-    response = client.patch(f"{url}/{db_lecturer.id}", json=body)
+@pytest.mark.parametrize(
+    'lecturer_n,response_status',
+    [
+        (0, status.HTTP_200_OK),
+        (1, status.HTTP_200_OK),
+        (2, status.HTTP_200_OK),
+        (3, status.HTTP_404_NOT_FOUND),
+    ],
+)
+def test_get_lecturer(client, dbsession, lecturers, lecturer_n, response_status):
+    lecturer = (
+        dbsession.query(Lecturer).filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id).one_or_none()
+    )
+    # check non-existing id request
+    lecturer_id = -1
+    if lecturer:
+        lecturer_id = lecturer.id
+    get_response = client.get(f'{url}/{lecturer_id}')
+    assert get_response.status_code == response_status
+    if response_status == status.HTTP_200_OK:
+        json_response = get_response.json()
+        assert json_response["mark_kindness"] is None
+        assert json_response["mark_freebie"] is None
+        assert json_response["mark_clarity"] is None
+        assert json_response["mark_general"] is None
+        assert json_response["comments"] is None
+
+
+@pytest.mark.parametrize(
+    'lecturer_n,mark_kindness,mark_freebie,mark_clarity,mark_general',
+    [(0, 1.5, 1.5, 1.5, 1.5), (1, 0, 0, 0, 0), (2, 0.5, 0.5, 0.5, 0.5)],
+)
+def test_get_lecturer_with_comments(
+    client, lecturers_with_comments, lecturer_n, mark_kindness, mark_freebie, mark_clarity, mark_general
+):
+    lecturers, comments = lecturers_with_comments
+    query = {"info": ['comments', 'mark']}
+    response = client.get(f'{url}/{lecturers[lecturer_n].id}', params=query)
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
-    assert json_response["first_name"] == 'Алексей'
-    assert json_response["last_name"] == 'Алексеев'
-    assert json_response["middle_name"] == "Алексеевич"
-    body = {
-        "first_name": 'Иван',
-        "last_name": 'Иванов',
-        "middle_name": 'Иванович',
-    }
-    response = client.patch(f"{url}/{db_lecturer.id}", json=body)
+    assert json_response["mark_kindness"] == mark_kindness
+    assert json_response["mark_freebie"] == mark_freebie
+    assert json_response["mark_clarity"] == mark_clarity
+    assert json_response["mark_general"] == mark_general
+    assert comments[lecturer_n * 6 + 0].subject in json_response["subjects"]
+    assert comments[lecturer_n * 6 + 1].subject in json_response["subjects"]
+    assert comments[lecturer_n * 6 + 2].subject not in json_response["subjects"]
+    assert len(json_response["comments"]) == 4
+
+
+@pytest.mark.parametrize(
+    'query,total,response_status',
+    [
+        ({'name': 'test_lname1'}, 1, status.HTTP_200_OK),
+        ({'name': 'TeSt_LnAmE1'}, 1, status.HTTP_200_OK),
+        ({'name': 'test'}, 2, status.HTTP_200_OK),
+        ({'name': 'testlname123'}, 0, status.HTTP_404_NOT_FOUND),
+    ],
+)
+def test_get_lecturers_by_name(client, lecturers, query, total, response_status):
+    get_response = client.get(f'{url}', params=query)
+    assert get_response.status_code == response_status
+    if response_status == status.HTTP_200_OK:
+        json_response = get_response.json()
+        json_response["total"] == total
+        assert json_response["lecturers"][0]["first_name"] == lecturers[0].first_name
+
+
+@pytest.mark.parametrize(
+    'body,response_status',
+    [
+        (
+            {
+                "first_name": 'Test',
+                "last_name": 'Testov',
+                "middle_name": 'Testovich',
+            },
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "first_name": 'Testa',
+                "last_name": 'Testova',
+                "middle_name": 'Testovna',
+            },
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "first_name": 'Test',
+                "last_name": 'Testov',
+                "middle_name": 1,
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+    ],
+)
+def test_update_lecturer(client, lecturer, body, response_status):
+    response = client.get(f'{url}/{lecturer.id}')
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
-    assert json_response["first_name"] == 'Иван'
-    assert json_response["last_name"] == 'Иванов'
-    assert json_response["middle_name"] == "Иванович"
-    dbsession.delete(lecturer)
-    dbsession.commit()
+    assert json_response['first_name'] == lecturer.first_name
+    assert json_response['last_name'] == lecturer.last_name
+    assert json_response['middle_name'] == lecturer.middle_name
+    response = client.patch(f"{url}/{lecturer.id}", json=body)
+    assert response.status_code == response_status
+    if response_status == status.HTTP_200_OK:
+        json_response = response.json()
+        assert json_response["first_name"] == body["first_name"]
+        assert json_response["last_name"] == body["last_name"]
+        assert json_response["middle_name"] == body["middle_name"]
 
 
-def test_delete_lecturer(client, dbsession):
-    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
-    lecturer: Lecturer = Lecturer(**body)
-    dbsession.add(lecturer)
-    dbsession.commit()
-    comment: dict = {
-        "subject": "Физика",
-        "text": "Хороший преподаватель",
-        "mark_kindness": 2,
-        "mark_freebie": 0,
-        "mark_clarity": 2,
-        "lecturer_id": lecturer.id,
-        "review_status": ReviewStatus.APPROVED,
-    }
-    comment: Comment = Comment.create(session=dbsession, **comment)
-    dbsession.commit()
-    lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
-    assert lecturer is not None
-    response = client.delete(f"{url}/{lecturer.id}")
+def test_delete_lecturer(client, dbsession, lecturers_with_comments):
+    lecturers, comments = lecturers_with_comments
+    response = client.delete(f"{url}/{lecturers[0].id}")
     assert response.status_code == status.HTTP_200_OK
-    response = client.delete(f"{url}/{lecturer.id}")
+    # trying to delete deleted
+    response = client.delete(f"{url}/{lecturers[0].id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    lecturer.is_deleted = True
-    comment.is_deleted = True
-    dbsession.delete(comment)
-    dbsession.delete(lecturer)
-    dbsession.commit()
+    dbsession.refresh(comments[0])
+    dbsession.refresh(comments[1])
+    dbsession.refresh(comments[2])
+    dbsession.refresh(lecturers[0])
+    assert comments[0].is_deleted
+    assert comments[1].is_deleted
+    assert comments[2].is_deleted
+    assert lecturers[0].is_deleted
+    # trying to get deleted
+    response = client.get(f'{url}/{lecturers[0].id}')
+    assert response.status_code == status.HTTP_404_NOT_FOUND

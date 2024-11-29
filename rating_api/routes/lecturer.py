@@ -52,6 +52,7 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
         raise ObjectNotFound(Lecturer, id)
     result = LecturerGet.model_validate(lecturer)
     result.comments = None
+    
     for comment in lecturer.comments:
         if comment.review_status is ReviewStatus.APPROVED:
             comment = LecturerGet.model_validate(comment)
@@ -63,6 +64,7 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
             result.mark_freebie += comment.mark_freebie
             general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
             result.mark_general = sum(general_marks) / len(general_marks)
+            
         if approved_comments:
             result.subjects = list({comment.subject for comment in approved_comments})
     return result
@@ -73,19 +75,21 @@ async def get_lecturers(
     limit: int = 10,
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
-    order_by: list[Literal["general", '']] = Query(default=[]),
+    order_by: str = Query(
+        enum=["mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"], default="mark_general"
+    ),
     subject: str = Query(''),
     name: str = Query(''),
+    asc_order: bool = False,
 ) -> LecturerGetAll:
     """
-    Scopes: `["rating.lecturer.read"]`
-
     `limit` - максимальное количество возвращаемых преподавателей
 
     `offset` - нижняя граница получения преподавателей, т.е. если по дефолту первым возвращается преподаватель с условным номером N, то при наличии ненулевого offset будет возвращаться преподаватель с номером N + offset
 
-    `order_by` - возможные значения `'general'`.
-    Если передано `'general'` - возвращается список преподавателей отсортированных по общей оценке
+    `order_by` - возможные значения `"mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"`.
+    Если передано `'last_name'` - возвращается список преподавателей отсортированных по алфавиту по фамилиям
+    Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
 
     `info` - возможные значения `'comments'`, `'mark'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
@@ -97,16 +101,31 @@ async def get_lecturers(
 
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
+
+    `asc_order`
+    Если передано true, сортировать в порядке возрастания
+    Иначе - в порядке убывания
     """
-    lecturers_query = Lecturer.query(session=db.session)
-    if subject:
-        lecturers_query = lecturers_query.join(Lecturer.comments).filter(Lecturer.search_by_subject(subject))
-    lecturers_query = lecturers_query.filter(Lecturer.search_by_name(name))
-    lecturers = lecturers_query.all()
+    lecturers_query = (
+        Lecturer.query(session=db.session)
+        .outerjoin(Lecturer.comments)
+        .group_by(Lecturer.id)
+        .filter(Lecturer.search_by_subject(subject))
+        .filter(Lecturer.search_by_name(name))
+        .order_by(
+            Lecturer.order_by_mark(order_by, asc_order)
+            if "mark" in order_by
+            else Lecturer.order_by_name(order_by, asc_order)
+        )
+    )
+
+    lecturers = lecturers_query.offset(offset).limit(limit).all()
+    lecturers_count = lecturers_query.group_by(Lecturer.id).count()
+
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
-    result = LecturerGetAll(limit=limit, offset=offset, total=len(lecturers))
-    for db_lecturer in lecturers[offset : limit + offset]:
+    result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
+    for db_lecturer in lecturers:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
         if db_lecturer.comments:
@@ -118,30 +137,23 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
-                if "mark" in info and approved_comments:
-                    '''if result.mark_freebie == None:
-                        result.mark_freebie = 0
-                    if result.mark_kindness == None:
-                        result.mark_kindness = 0
-                    if result.mark_clarity == None:
-                        result.mark_clarity = 0
-                    result.mark_freebie = ('''
-                    result.mark_freebie * (len(approved_comments) - 1) + approved_comments[-1]
-                    ) / len(approved_comments)
-                    result.mark_kindness = (
-                        result.mark_kindness * (len(approved_comments) - 1) + approved_comments[-1]
-                    ) / len(approved_comments)
-                    result.mark_clarity = (
-                        result.mark_clarity * (len(approved_comments) - 1) + approved_comments[-1]
-                    ) / len(approved_comments)
-                    general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
-                    result.mark_general = sum(general_marks) / len(general_marks)
-
+              
+                lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
+                    approved_comments
+                )
+                lecturer_to_result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(
+                    approved_comments
+                )
+                lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
+                    approved_comments
+                )
+                lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
+                    approved_comments
+                )
+                
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
-    if "general" in order_by:
-        result.lecturers.sort(key=lambda item: (item.mark_general is None, item.mark_general))
     return result
 
 
