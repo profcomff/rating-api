@@ -121,8 +121,6 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
-                result.mark_freebie, result.mark_kindness, result.mark_clarity = 0, 0, 0
-
                 for comment in approved_comments:
                     result.mark_freebie += comment.mark_freebie
                     result.mark_kindness += comment.mark_kindness
