@@ -52,18 +52,15 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
         raise ObjectNotFound(Lecturer, id)
     result = LecturerGet.model_validate(lecturer)
     result.comments = None
-    if lecturer.comments:
-        approved_comments: list[CommentGet] = [
-            CommentGet.model_validate(comment)
-            for comment in lecturer.comments
-            if comment.review_status is ReviewStatus.APPROVED
-        ]
-        if "comments" in info and approved_comments:
-            result.comments = approved_comments
-        if "mark" in info and approved_comments:
-            result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(approved_comments)
-            result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(approved_comments)
-            result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
+    for comment in lecturer.comments:
+        if comment.review_status is ReviewStatus.APPROVED:
+            comment = LecturerGet.model_validate(comment)
+        else: 
+            continue
+        if "comments" in info:
+            result.comments.append(comment) 
+        if "mark" in info:
+            result.mark_freebie += comment.mark_freebie
             general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
             result.mark_general = sum(general_marks) / len(general_marks)
         if approved_comments:
@@ -121,17 +118,24 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
-                for comment in approved_comments:
-                    result.mark_freebie += comment.mark_freebie
-                    result.mark_kindness += comment.mark_kindness
-                    result.mark_clarity += comment.mark_clarity
-
-                general_marks = [
-                    result.mark_freebie / len(approved_comments),
-                    result.mark_kindness / len(approved_comments),
-                    result.mark_clarity / len(approved_comments),
-                ]
-                result.mark_general = sum(general_marks) / len(general_marks)
+                if "mark" in info and approved_comments:
+                    '''if result.mark_freebie == None:
+                        result.mark_freebie = 0
+                    if result.mark_kindness == None:
+                        result.mark_kindness = 0
+                    if result.mark_clarity == None:
+                        result.mark_clarity = 0
+                    result.mark_freebie = ('''
+                    result.mark_freebie * (len(approved_comments) - 1) + approved_comments[-1]
+                    ) / len(approved_comments)
+                    result.mark_kindness = (
+                        result.mark_kindness * (len(approved_comments) - 1) + approved_comments[-1]
+                    ) / len(approved_comments)
+                    result.mark_clarity = (
+                        result.mark_clarity * (len(approved_comments) - 1) + approved_comments[-1]
+                    ) / len(approved_comments)
+                    general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
+                    result.mark_general = sum(general_marks) / len(general_marks)
 
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
