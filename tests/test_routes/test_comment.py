@@ -308,12 +308,12 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
         ),
     ],
 )
-def test_update_comment(client, dbsession, comment_update, body, response_status):
-    response = client.patch(f"{url}/{comment_update.uuid}", json=body)
+def test_update_comment(client, dbsession, nonanonymous_comment, body, response_status):
+    response = client.patch(f"{url}/{nonanonymous_comment.uuid}", json=body)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
-        dbsession.refresh(comment_update)
-        assert comment_update.review_status == ReviewStatus.PENDING
+        dbsession.refresh(nonanonymous_comment)
+        assert nonanonymous_comment.review_status == ReviewStatus.PENDING
 
 
 def test_delete_comment(client, dbsession, comment):

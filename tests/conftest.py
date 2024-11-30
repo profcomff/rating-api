@@ -82,10 +82,10 @@ def unreviewed_comment(dbsession, lecturer):
 
 
 @pytest.fixture
-def comment_update(dbsession, lecturer):
+def nonanonymous_comment(dbsession, lecturer):
     _comment = Comment(
-        subject="update_subject",
-        text="update_comment",
+        subject="subject",
+        text="omment",
         mark_kindness=1,
         mark_clarity=1,
         mark_freebie=1,
