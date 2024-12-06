@@ -26,41 +26,41 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
-    lecturer = Lecturer.get(session=db.session, id=lecturer_id)
-    if not lecturer:
-        raise ObjectNotFound(Lecturer, lecturer_id)
+ 
+import datetime
 
-    user_comments: list[LecturerUserComment] = (
-        LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
-    )
-    for user_comment in user_comments:
-        if  datetime.datetime.now().month - user_comment.update_ts < datetime.timedelta(
-            month=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH
-        ) and datetime.datetime.now().year != datetime.timedelta(
-            year=settings.COMMENT_CREATE_FREQUENCY_IN_YEAR
-        ):
-          raise TooManyCommentRequests(
-                dtime=user_comment.update_ts
-                + datetime.timedelta(month=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH)
-                + datetime.timedelta(year=settings.COMMENT_CREATE_FREQUENCY_IN_YEAR)
-                - datetime.datetime.now().month
-                - datetime.datetime.now().year 
-            )
-    # Сначала добавляем с user_id, который мы получили при авторизации,
-    # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
-    LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+if not lecturer:
+    raise ObjectNotFound(Lecturer, lecturer_id)
 
-    # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
-    user_id = None if comment_info.is_anonymous else user.get('id')
+current_month_start = datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, 1)
 
-    new_comment = Comment.create(
-        session=db.session,
-        **comment_info.model_dump(exclude={"is_anonymous"}),
-        lecturer_id=lecturer_id,
-        user_id=user_id,
-        review_status=ReviewStatus.PENDING,
-    )
-    return CommentGet.model_validate(new_comment)
+last_comment = LecturerUserComment.query.filter(
+    LecturerUserComment.lecturer_id == lecturer_id,
+    LecturerUserComment.user_id == user.get('id'),
+    LecturerUserComment.update_ts >= current_month_start
+).order_by(LecturerUserComment.update_ts.desc()).first()
+
+if last_comment:
+    time_since_last_comment = datetime.datetime.now() - last_comment.update_ts
+    allowed_time = datetime.timedelta(days=30 * settings.COMMENT_CREATE_FREQUENCY_IN_MONTH)
+    if time_since_last_comment < allowed_time:
+        raise TooManyCommentRequests(dtime=last_comment.update_ts + allowed_time)
+
+# анонимность комментария
+user_id = None if comment_info.is_anonymous else user.get('id')
+
+# Создаем комментарий только один раз
+new_comment = LecturerUserComment.create(
+    session=db.session,
+    *comment_info.model_dump(exclude={"is_anonymous"}),
+    lecturer_id=lecturer_id,
+    user_id=user_id,
+    update_ts=datetime.datetime.now(), # обязательно установить update_ts
+    review_status=ReviewStatus.PENDING, 
+)
+
+return CommentGet.model_validate(new_comment)
 
 
 @comment.get("/{uuid}", response_model=CommentGet)
