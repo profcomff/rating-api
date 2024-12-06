@@ -9,7 +9,6 @@ from fastapi_sqlalchemy import db
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from starlette import status
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost, CommentUpdate
 from rating_api.settings import Settings, get_settings
 
@@ -163,15 +162,15 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
 
     if comment.user_id != user.get("id") or comment.user_id is None:
         raise ForbiddenAction(Comment)
-    
+
     # Если не передано ни одного параметра
     if not comment_update.model_dump(exclude_unset=True):
         raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
-    
+
     # Если хоть одно поле было передано неизменным
     if set(comment.__dict__.items()).intersection(set(comment_update.model_dump(exclude_unset=True).items())):
         raise HTTPException(status_code=426, detail="No changes detected")  # 426
-    
+
     # Проверить поле update_ts create comment на null
     return CommentGet.model_validate(
         Comment.update(

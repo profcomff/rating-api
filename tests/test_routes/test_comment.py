@@ -308,25 +308,24 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
         ),
         (  # Переданы НЕизмененные поля
             {
-                "subject":"subject",
-                "text":"comment",
-                "mark_kindness":1,
-                "mark_clarity":1,
-                "mark_freebie":1,
+                "subject": "subject",
+                "text": "comment",
+                "mark_kindness": 1,
+                "mark_clarity": 1,
+                "mark_freebie": 1,
             },
             status.HTTP_426_UPGRADE_REQUIRED,
         ),
-        ( # НЕизмененным перелано одно поле
+        (  # НЕизмененным перелано одно поле
             {
-                "subject":"asf",
-                "text":"asf",
-                "mark_kindness":2,
-                "mark_clarity":2,
-                "mark_freebie":1,
+                "subject": "asf",
+                "text": "asf",
+                "mark_kindness": 2,
+                "mark_clarity": 2,
+                "mark_freebie": 1,
             },
             status.HTTP_426_UPGRADE_REQUIRED,
         ),
-        
     ],
 )
 def test_update_comment(client, dbsession, nonanonymous_comment, body, response_status):
