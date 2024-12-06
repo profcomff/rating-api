@@ -93,7 +93,7 @@ class LecturerPost(Base):
     last_name: str
     middle_name: str
     avatar_link: str | None = None
-    timetable_id: int
+    timetable_id: int | None = None
 
 
 class LecturerPatch(Base):
