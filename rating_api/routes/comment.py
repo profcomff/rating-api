@@ -56,7 +56,7 @@ new_comment = LecturerUserComment.create(
     *comment_info.model_dump(exclude={"is_anonymous"}),
     lecturer_id=lecturer_id,
     user_id=user_id,
-    update_ts=datetime.datetime.now(), # обязательно установить update_ts
+    update_ts=datetime.datetime.now(), 
     review_status=ReviewStatus.PENDING, 
 )
 
