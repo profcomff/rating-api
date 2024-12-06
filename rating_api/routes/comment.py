@@ -25,41 +25,79 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Для создания комментария нужно быть авторизованным
 
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
-    """
+ """   
 
+    # Функция для форматирования даты в формат "Месяц Год"
+    def format_date(date_obj):
+        if isinstance(date_obj, datetime.datetime):
+            return date_obj.strftime("%B %Y") 
+        return date_obj #Если это не datetime объект, возвращаем как есть
 
-lecturer = Lecturer.get(session=db.session, id=lecturer_id)
-if not lecturer:
-    raise ObjectNotFound(Lecturer, lecturer_id)
+    lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+    if not lecturer:
+        raise ObjectNotFound(Lecturer, lecturer_id)
 
-current_month_start = datetime.datetime(datetime.datetime.now().year, datetime.datetime.now().month, 1)
+    has_create_scope = "rating.comment.import" in [scope['name'] for scope in user.get('session_scopes')]
+    if (comment_info.create_ts or comment_info.update_ts) and not has_create_scope:
+        raise ForbiddenAction(Comment)
 
-last_comment = LecturerUserComment.query.filter(
-    LecturerUserComment.lecturer_id == lecturer_id,
-    LecturerUserComment.user_id == user.get('id'),
-    LecturerUserComment.update_ts >= current_month_start
-).order_by(LecturerUserComment.update_ts.desc()).first()
+    if not has_create_scope:
+        user_comments: list[LecturerUserComment] = (
+            LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
+        )
 
-if last_comment:
-    time_since_last_comment = datetime.datetime.now() - last_comment.update_ts
-    allowed_time = datetime.timedelta(days=30 * settings.COMMENT_CREATE_FREQUENCY_IN_MONTH)
-    if time_since_last_comment < allowed_time:
-        raise TooManyCommentRequests(dtime=last_comment.update_ts + allowed_time)
+    current_month_start = datetime.datetime(datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1)
+    formatted_current_month_start = format_date(current_month_start) #Форматируем дату
 
-# анонимность комментария
-user_id = None if comment_info.is_anonymous else user.get('id')
+    # Получаем все комментарии пользователя за текущий месяц.
+    user_comments_this_month = LecturerUserComment.query.filter(
+        LecturerUserComment.lecturer_id == lecturer_id,
+        LecturerUserComment.user_id == user.get('id'),
+        LecturerUserComment.update_ts <= current_month_start
+    ).all()
 
-# Создаем комментарий только один раз
-new_comment = LecturerUserComment.create(
-    session=db.session,
-    *comment_info.model_dump(exclude={"is_anonymous"}),
-    lecturer_id=lecturer_id,
-    user_id=user_id,
-    update_ts=datetime.datetime.now(), 
-    review_status=ReviewStatus.PENDING, 
-)
+    #Проверка на превышение лимита комментариев 
+    if len(user_comments_this_month) >= settings.COMMENT_CREATE_FREQUENCY_IN_MONTH:
+        raise TooManyCommentRequests(dtime=formatted_current_month_start) #Передаем отформатированную дату
 
-return CommentGet.model_validate(new_comment)
+    # Создаем новый комментарий
+    new_comment = LecturerUserComment.create(
+        session=db.session,
+        lecturer_id=lecturer_id,
+        user_id=user.get('id'),
+        update_ts=datetime.datetime.now()
+    )
+
+    # Форматируем дату нового комментария
+    formatted_new_comment_date = format_date(new_comment.update_ts)
+
+    last_comment = LecturerUserComment.query.filter(
+        LecturerUserComment.lecturer_id == lecturer_id,
+        LecturerUserComment.user_id == user.get('id'),
+        LecturerUserComment.update_ts >= current_month_start
+    ).order_by(LecturerUserComment.update_ts.desc()).first()
+
+    if last_comment:
+        time_since_last_comment = datetime.datetime.now() - last_comment.update_ts
+        allowed_time = datetime.timedelta(days=30 * settings.COMMENT_CREATE_FREQUENCY_IN_MONTH)
+        if time_since_last_comment < allowed_time:
+            raise TooManyCommentRequests(dtime=last_comment.update_ts + allowed_time)
+        # Сначала добавляем с user_id, который мы получили при авторизации,
+        # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
+        LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+
+        # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
+        user_id = None if comment_info.is_anonymous else user.get('id')
+
+        new_comment = Comment.create(
+            session=db.session,
+            **comment_info.model_dump(exclude={"is_anonymous"}),
+            lecturer_id=lecturer_id,
+            user_id=user_id,
+            review_status=ReviewStatus.PENDING,\
+        )
+        
+        return CommentGet.model_validate(new_comment)
 
 
 @comment.get("/{uuid}", response_model=CommentGet)
