@@ -35,18 +35,17 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ForbiddenAction(Comment)
 
     if not has_create_scope:
-        user_comments: list[LecturerUserComment] = (
-            LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
-        )
-        for user_comment in user_comments:
-            if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
-                minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
-            ):
-                raise TooManyCommentRequests(
-                    dtime=user_comment.update_ts
-                    + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                    - datetime.datetime.utcnow()
-                )
+    # Все комментарии пользователя за текущий месяц
+        current_month_start = datetime.datetime(datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1)
+        user_comments = LecturerUserComment.query(session=db.session).filter(
+        LecturerUserComment.user_id == user.get("id"),
+        LecturerUserComment.update_ts >= current_month_start
+        ).all()
+    
+    # Сравниваем количество комментариев с лимитом
+        if len(user_comments) >= settings.COMMENT_CREATE_FREQUENCY_IN_MONTH:
+            raise TooManyCommentRequests(dtime=current_month_start)
+
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
