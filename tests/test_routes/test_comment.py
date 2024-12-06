@@ -304,8 +304,29 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
         ),
         (  # Отсутсвует все поля
             {},
-            status.HTTP_200_OK,
+            status.HTTP_409_CONFLICT,
         ),
+        (  # Переданы НЕизмененные поля
+            {
+                "subject":"subject",
+                "text":"comment",
+                "mark_kindness":1,
+                "mark_clarity":1,
+                "mark_freebie":1,
+            },
+            status.HTTP_426_UPGRADE_REQUIRED,
+        ),
+        ( # НЕизмененным перелано одно поле
+            {
+                "subject":"asf",
+                "text":"asf",
+                "mark_kindness":2,
+                "mark_clarity":2,
+                "mark_freebie":1,
+            },
+            status.HTTP_426_UPGRADE_REQUIRED,
+        ),
+        
     ],
 )
 def test_update_comment(client, dbsession, nonanonymous_comment, body, response_status):

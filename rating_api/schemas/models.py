@@ -40,11 +40,11 @@ class CommentPost(Base):
 
 
 class CommentUpdate(Base):
-    subject: str | None = None
-    text: str | None = None
-    mark_kindness: int | None = None
-    mark_freebie: int | None = None
-    mark_clarity: int | None = None
+    subject: str = None
+    text: str = None
+    mark_kindness: int = None
+    mark_freebie: int = None
+    mark_clarity: int = None
 
     @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
     @classmethod
