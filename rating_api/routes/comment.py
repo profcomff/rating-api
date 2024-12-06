@@ -37,20 +37,27 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     if not has_create_scope:
     # Все комментарии пользователя за текущий месяц
         current_month_start = datetime.datetime(datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1)
-        user_comments = LecturerUserComment.query(session=db.session).filter(
+        user_comments_count = LecturerUserComment.query(session=db.session).filter(
         LecturerUserComment.user_id == user.get("id"),
         LecturerUserComment.update_ts >= current_month_start
-        ).all()
+        ).count()
     
     # Сравниваем количество комментариев с лимитом
-        if len(user_comments) >= settings.COMMENT_CREATE_FREQUENCY_IN_MONTH:
+        if user_comments_count >= settings.COMMENT_CREATE_FREQUENCY_IN_MONTH:
             raise TooManyCommentRequests(dtime=current_month_start)
 
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
-    LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
-
+    # То, что было: LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+    create_ts = datetime.datetime(datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1)
+    LecturerUserComment.create(
+        session=db.session,
+        lecturer_id=lecturer_id,
+        user_id=user.get('id'),
+        create_ts=create_ts, # Добавляем create_ts
+        update_ts=create_ts   # И update_ts
+    )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
 
