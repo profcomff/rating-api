@@ -44,12 +44,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     
     # Сравниваем количество комментариев с лимитом
         if user_comments_count >= settings.COMMENT_CREATE_FREQUENCY_IN_MONTH:
-            raise TooManyCommentRequests(dtime=current_month_start)
+            raise TooManyCommentRequests(dtime=current_month_start + datetime.timedelta(month=1) - datetime.datetime.utcnow())
 
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
-    # То, что было: LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
+    
     create_ts = datetime.datetime(datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1)
     LecturerUserComment.create(
         session=db.session,
