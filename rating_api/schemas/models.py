@@ -22,7 +22,7 @@ class CommentGet(Base):
 
 
 class CommentPost(Base):
-    subject: str
+    subject: str | None
     text: str
     create_ts: datetime.datetime | None = None
     update_ts: datetime.datetime | None = None
@@ -37,6 +37,14 @@ class CommentPost(Base):
         if value not in [-2, -1, 0, 1, 2]:
             raise WrongMark()
         return value
+
+
+class CommentImport(CommentPost):
+    lecturer_id: int
+
+
+class CommentImportAll(Base):
+    comments: list[CommentImport]
 
 
 class CommentGetAll(Base):
