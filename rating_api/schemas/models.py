@@ -37,11 +37,15 @@ class CommentPost(Base):
         if value not in [-2, -1, 0, 1, 2]:
             raise WrongMark()
         return value
+
+
 class CommentImport(CommentPost):
     lecturer_id: int
 
+
 class CommentImportAll(Base):
     comments: list[CommentImport]
+
 
 class CommentGetAll(Base):
     comments: list[CommentGet] = []
