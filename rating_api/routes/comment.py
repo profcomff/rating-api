@@ -9,7 +9,7 @@ from fastapi_sqlalchemy import db
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost, CommentImportAll
 from rating_api.settings import Settings, get_settings
 
 
@@ -64,6 +64,16 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     )
     return CommentGet.model_validate(new_comment)
 
+@comment.post('/import', response_model=CommentGetAll)
+async def import_comments(comments_info: CommentImportAll, _=Depends(UnionAuth(scopes=["rating.comment.import"]))) -> CommentGetAll:
+    number_of_comments = len(comments_info.comments)
+    result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
+    for comment_info in comments_info.comments:
+        new_comment = Comment.create(session=db.session,
+        **comment_info.model_dump(exclude={"is_anonymous"}),
+        review_status=ReviewStatus.APPROVED,)
+        result.comments.append(new_comment)
+    return result
 
 @comment.get("/{uuid}", response_model=CommentGet)
 async def get_comment(uuid: UUID) -> CommentGet:
