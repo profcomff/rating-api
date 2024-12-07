@@ -65,7 +65,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     return CommentGet.model_validate(new_comment)
 
 @comment.post('/import', response_model=CommentGetAll)
-async def import_comments(comments_info: CommentImportAll, _=Depends(UnionAuth(scopes=["rating.comment.import"]))) -> CommentGetAll:
+async def import_comments(comments_info: CommentImportAll,
+                          _=Depends(UnionAuth(scopes=["rating.comment.import"]))) -> CommentGetAll:
+    """
+    Scopes: `["rating.comment.import"]`
+    Создает комментарии в базе данных RatingAPI
+    """
     number_of_comments = len(comments_info.comments)
     result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
     for comment_info in comments_info.comments:
