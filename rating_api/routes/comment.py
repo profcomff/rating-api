@@ -9,7 +9,7 @@ from fastapi_sqlalchemy import db
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost, CommentImportAll
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
 from rating_api.settings import Settings, get_settings
 
 
