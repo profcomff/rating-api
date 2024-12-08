@@ -36,7 +36,11 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     if not has_create_scope:
         # Все комментарии пользователя за текущий месяц
-        current_month_start = current_month_start
+        current_month_start = datetime.datetime(
+            datetime.datetime.now(ts=datetime.timezone.utc).year,
+            datetime.datetime.now(ts=datetime.timezone.utc).month,
+            1,
+        )
         user_comments_count = (
             LecturerUserComment.query(session=db.session)
             .filter(LecturerUserComment.user_id == user.get("id"), LecturerUserComment.update_ts >= current_month_start)
@@ -52,9 +56,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
 
-    create_ts = datetime.datetime(
-        datetime.datetime.now(ts=datetime.timezone.utc).year, datetime.datetime.now(ts=datetime.timezone.utc).month, 1
-    )
+    create_ts = current_month_start
     LecturerUserComment.create(
         session=db.session,
         lecturer_id=lecturer_id,
