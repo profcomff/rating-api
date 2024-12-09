@@ -335,7 +335,7 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
         dbsession.refresh(nonanonymous_comment)
         assert nonanonymous_comment.review_status == ReviewStatus.PENDING
         for k, v in body.items():
-            getattr(nonanonymous_comment, k, None) == v  # Есть ли изменения в БД
+            assert getattr(nonanonymous_comment, k, None) == v  # Есть ли изменения в БД
 
 
 def test_delete_comment(client, dbsession, comment):
