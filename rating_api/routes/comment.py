@@ -17,6 +17,7 @@ settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
+
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
@@ -26,6 +27,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
+    current_month_start = datetime.datetime(now.year, now.month, 1)  # Начало текущего месяца
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
@@ -35,36 +37,24 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ForbiddenAction(Comment)
 
     if not has_create_scope:
-        # Все комментарии пользователя за текущий месяц
-        current_month_start = datetime.datetime(
-            datetime.datetime.now(ts=datetime.timezone.utc).year,
-            datetime.datetime.now(ts=datetime.timezone.utc).month,
-            1,
-        )
-        # Все комментарии пользователя за последние COMMENT_CREATE_FREQUENCY_IN_MONTH (n) месяцев
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
+        date_count = current_month_start - relativedelta(months=settings.COMMENT_FREQUENCY_IN_MONTH)
+
         user_comments_count = (
             LecturerUserComment.query(session=db.session)
             .filter(
                 LecturerUserComment.user_id == user.get("id"),
-                LecturerUserComment.update_ts
-                >= current_month_start - datetime.timedelta(days=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH * 30)
-                - datetime.timedelta(
-                    days=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH * 31
-                ),  
+                LecturerUserComment.update_ts >= date_count,
             )
             .count()
         )
 
-        if (
-            user_comments_count >= settings.COUNT_COMMENT_FREQUENCY
-        ):  # Проверка на превышение лимита (m разрешенных комментариев (За COMMENT_CREATE_FREQUENCY_IN_MONTH месяцев))
-            raise TooManyCommentRequests(
-                dtime=current_month_start + datetime.timedelta(days=30) - datetime.datetime.utcnow()
-            )
-        # Oграничение комментариев одному лектору за период
-    now = datetime.datetime.now(ts=datetime.timezone.utc)
-    cutoff_date_lecturer = now - datetime.timedelta(days=30 * settings.MONTH_LECTURER_FREQUENCY) #  L месяцев назад
-
+        if user_comments_count >= settings.COMMENT_LIMIT: 
+            raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
+        # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
+    cutoff_date_lecturer = current_month_start - relativedelta(months=settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH)
     lecturer_comments_count = (
         LecturerUserComment.query(session=db.session)
         .filter(
@@ -75,16 +65,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         .count()
     )
 
-    if lecturer_comments_count >= settings.COMMENT_LECTURER_FREQUENCY:
-        raise TooManyCommentsToLecturer(lecturer_id) 
-
-    # Проверка на максимальное количество комментариев одному лектору от пользователя
-    user_comments_to_lecturer_count = (
-        LecturerUserComment.query(session=db.session)
-        .filter(LecturerUserComment.user_id == user.get("id"), LecturerUserComment.lecturer_id == lecturer_id)
-        .count()
-    )
-    if user_comments_to_lecturer_count >= settings.MAX_COMMENTS_TO_LECTURER:
+    if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
         raise TooManyCommentsToLecturer(lecturer_id)
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
