@@ -47,7 +47,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             .filter(
                 LecturerUserComment.user_id == user.get("id"),
                 LecturerUserComment.update_ts
-                >= current_month_start - datetime.timedelta(days=COMMENT_CREATE_FREQUENCY_IN_MONTH * 30)
+                >= current_month_start - datetime.timedelta(days=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH * 30)
                 - datetime.timedelta(
                     days=settings.COMMENT_CREATE_FREQUENCY_IN_MONTH * 31
                 ),  
@@ -61,6 +61,22 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             raise TooManyCommentRequests(
                 dtime=current_month_start + datetime.timedelta(days=30) - datetime.datetime.utcnow()
             )
+        # Oграничение комментариев одному лектору за период
+    now = datetime.datetime.now(ts=datetime.timezone.utc)
+    cutoff_date_lecturer = now - datetime.timedelta(days=30 * settings.MONTH_LECTURER_FREQUENCY) #  L месяцев назад
+
+    lecturer_comments_count = (
+        LecturerUserComment.query(session=db.session)
+        .filter(
+            LecturerUserComment.user_id == user.get("id"),
+            LecturerUserComment.lecturer_id == lecturer_id,
+            LecturerUserComment.update_ts >= cutoff_date_lecturer,
+        )
+        .count()
+    )
+
+    if lecturer_comments_count >= settings.COMMENT_LECTURER_FREQUENCY:
+        raise TooManyCommentsToLecturer(lecturer_id) 
 
     # Проверка на максимальное количество комментариев одному лектору от пользователя
     user_comments_to_lecturer_count = (

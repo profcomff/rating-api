@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     COMMENT_CREATE_FREQUENCY_IN_MONTH: int = 1
     COUNT_COMMENT_FREQUENCY: int = 20
     MAX_COMMENTS_TO_LECTURER: int = 10
+    MONTH_LECTURER_FREQUENCY: int = k
+    COMMENT_LECTURER_FREQUENCY: int = l
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']
