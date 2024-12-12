@@ -17,7 +17,6 @@ settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
-
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
@@ -51,7 +50,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             .count()
         )
 
-        if user_comments_count >= settings.COMMENT_LIMIT: 
+        if user_comments_count >= settings.COMMENT_LIMIT:
             raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
         # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
     cutoff_date_lecturer = current_month_start - relativedelta(months=settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH)
