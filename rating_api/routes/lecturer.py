@@ -51,31 +51,36 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
     if lecturer is None:
         raise ObjectNotFound(Lecturer, id)
     result = LecturerGet.model_validate(lecturer)
-    result.comments = None
-    
-    if mark_freebie == None:
-        mark_freebie = 0
-    if mark_kindness == None:
-        mark_kindness = 0
-    if mark_clarity == None:
-        mark_clarity = 0
-    m = 0
+    result.comments = list()
+
+    subjects_set = set()  # множество для предметов
+    if "mark" in info:
+        result.mark_freebie, result.mark_clarity, result.mark_kindness, result.mark_general = 0, 0, 0, 0
+        aproved_comment_count = 0
     for comment in lecturer.comments:
         if comment.review_status is ReviewStatus.APPROVED:
-            comment = LecturerGet.model_validate(comment)
-        else: 
+            comment = CommentGet.model_validate(comment)
+        else:
             continue
         if "comments" in info:
-            result.comments.append(comment) 
+            result.comments.append(comment)
         if "mark" in info:
-            result.mark_freebie = ((result.mark_freebie)*(m)+(comment.mark_freebie))/(m-1)
-            result.mark_kindness = ((result.mark_kindness)*(m)+(comment.mark_kindness))/(m-1)
-            result.mark_clarity = ((result.mark_clarity)*(m)+(comment.mark_clarity))/(m-1)
-            m+=1
-            general_marks = [result.mark_freebie, result.mark_kindness, result.mark_clarity]
-            result.mark_general = sum(general_marks) / len(general_marks)
-
-            result.subjects = list({comment.subjects in comment})
+            aproved_comment_count += 1
+            result.mark_freebie += comment.mark_freebie
+            result.mark_clarity += comment.mark_clarity
+            result.mark_kindness += comment.mark_kindness
+            result.mark_general += comment.mark_general
+        if comment.subject is not None:
+            subjects_set.add(comment.subject)
+    if "mark" in info:
+        result.mark_clarity /= aproved_comment_count
+        result.mark_freebie /= aproved_comment_count
+        result.mark_kindness /= aproved_comment_count
+        result.mark_general /= aproved_comment_count
+    if len(result.comments) == 0:
+        result.comments = None
+    if len(subjects_set) != 0:
+        result.subjects = list(subjects_set)
     return result
 
 
@@ -146,7 +151,7 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = approved_comments
             if "mark" in info and approved_comments:
-              
+
                 lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
                     approved_comments
                 )
@@ -159,7 +164,7 @@ async def get_lecturers(
                 lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
                     approved_comments
                 )
-                
+
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)

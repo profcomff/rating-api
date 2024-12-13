@@ -1,11 +1,11 @@
 run:
-	. ./venv/bin/activate && uvicorn --reload --log-config logging_dev.conf rating_api.routes.base:app
+	source ./venv/bin/activate && uvicorn --reload --log-config logging_dev.conf rating_api.routes.base:app
 
 configure: venv
-	. ./venv/bin/activate && pip install -r requirements.dev.txt -r requirements.txt
+	source ./venv/bin/activate && pip install -r requirements.dev.txt -r requirements.txt
 
 venv:
-	python3 -m venv venv
+	python3.11 -m venv venv
 
 format:
 	autoflake -r --in-place --remove-all-unused-imports ./rating_api
