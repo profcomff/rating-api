@@ -1,6 +1,10 @@
 import datetime
 from typing import Literal
 from uuid import UUID
+from dateutil.relativedelta import relativedelta
+
+#  pip install python-dateutil
+
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
@@ -15,6 +19,7 @@ from rating_api.settings import Settings, get_settings
 
 settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
+now = datetime.datetime.now(tz=datetime.timezone.utc)
 
 
 @comment.post("", response_model=CommentGet)
@@ -36,10 +41,8 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ForbiddenAction(Comment)
 
     if not has_create_scope:
-        now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-        # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
         date_count = current_month_start - relativedelta(months=settings.COMMENT_FREQUENCY_IN_MONTH)
+        # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
 
         user_comments_count = (
             LecturerUserComment.query(session=db.session)
@@ -65,7 +68,9 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     )
 
     if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
-        raise TooManyCommentsToLecturer(lecturer_id)
+        raise TooManyCommentsToLecturer(
+            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
+        )
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
 

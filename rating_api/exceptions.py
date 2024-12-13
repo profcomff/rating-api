@@ -39,6 +39,19 @@ class TooManyCommentRequests(RatingAPIError):
         )
 
 
+class TooManyCommentsToLecturer(RatingAPIError):
+    frequency: int
+    limit: int
+
+    def __init__(self, frequency: int, limit: int):
+        self.frequency = frequency
+        self.limit = limit
+        super().__init__(
+            f"Too many comments to lecturer. Allowed: {limit} comments per {frequency} months.",
+            f"Превышен лимит комментариев лектору. Разрешено: {limit} комментариев за {frequency} месяцев.",
+        )
+
+
 class ForbiddenAction(RatingAPIError):
     def __init__(self, type: Type):
         super().__init__(f"Forbidden action with {type.__name__}", f"Запрещенное действие с объектом {type.__name__}")
