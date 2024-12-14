@@ -24,8 +24,6 @@ class CommentGet(Base):
 class CommentPost(Base):
     subject: str
     text: str
-    create_ts: datetime.datetime | None = None
-    update_ts: datetime.datetime | None = None
     mark_kindness: int
     mark_freebie: int
     mark_clarity: int
@@ -41,6 +39,8 @@ class CommentPost(Base):
 
 class CommentImport(CommentPost):
     lecturer_id: int
+    create_ts: datetime.datetime | None = None
+    update_ts: datetime.datetime | None = None
     subject: str | None = None
 
 

@@ -20,33 +20,25 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
-    Scopes: `["rating.comment.import"]`
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
 
-    Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
-
-    has_create_scope = "rating.comment.import" in [scope['name'] for scope in user.get('session_scopes')]
-    if (comment_info.create_ts or comment_info.update_ts) and not has_create_scope:
-        raise ForbiddenAction(Comment)
-
-    if not has_create_scope:
-        user_comments: list[LecturerUserComment] = (
-            LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
-        )
-        for user_comment in user_comments:
-            if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
-                minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
-            ):
-                raise TooManyCommentRequests(
-                    dtime=user_comment.update_ts
-                    + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                    - datetime.datetime.utcnow()
-                )
+    user_comments: list[LecturerUserComment] = (
+        LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
+    )
+    for user_comment in user_comments:
+        if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
+            minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
+        ):
+            raise TooManyCommentRequests(
+                dtime=user_comment.update_ts
+                + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
+                - datetime.datetime.utcnow()
+            )
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
