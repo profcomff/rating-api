@@ -28,6 +28,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
 
@@ -51,6 +52,20 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             )
             .count()
         )
+        cutoff_date_lecturer = datetime.datetime(
+            now.year - (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
+            (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
+            1,
+        )
+        lecturer_comments_count = (
+            LecturerUserComment.query(session=db.session)
+            .filter(
+                LecturerUserComment.user_id == user.get("id"),
+                LecturerUserComment.lecturer_id == lecturer_id,
+                LecturerUserComment.update_ts >= cutoff_date_lecturer,
+            )
+            .count()
+        )
 
         if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
             raise TooManyCommentsToLecturer(
@@ -60,21 +75,6 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         if user_comments_count >= settings.COMMENT_LIMIT:
             raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
         # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
-
-    cutoff_date_lecturer = datetime.datetime(
-        now.year - (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
-        (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
-        1,
-    )
-    lecturer_comments_count = (
-        LecturerUserComment.query(session=db.session)
-        .filter(
-            LecturerUserComment.user_id == user.get("id"),
-            LecturerUserComment.lecturer_id == lecturer_id,
-            LecturerUserComment.update_ts >= cutoff_date_lecturer,
-        )
-        .count()
-    )
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
