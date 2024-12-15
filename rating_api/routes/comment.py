@@ -1,7 +1,6 @@
 import datetime
 from typing import Literal
 from uuid import UUID
-from dateutil.relativedelta import relativedelta
 
 #  pip install python-dateutil
 
@@ -19,7 +18,6 @@ from rating_api.settings import Settings, get_settings
 
 settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
-now = datetime.datetime.now(tz=datetime.timezone.utc)
 
 
 @comment.post("", response_model=CommentGet)
@@ -31,7 +29,6 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
-    current_month_start = datetime.datetime(now.year, now.month, 1)  # Начало текущего месяца
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
@@ -41,7 +38,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ForbiddenAction(Comment)
 
     if not has_create_scope:
-        date_count = current_month_start - relativedelta(months=settings.COMMENT_FREQUENCY_IN_MONTH)
+        date_count = datetime.datetime(now.year - (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12, (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12, 1)
         # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
 
         user_comments_count = (
@@ -56,7 +53,8 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         if user_comments_count >= settings.COMMENT_LIMIT:
             raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
         # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
-    cutoff_date_lecturer = current_month_start - relativedelta(months=settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH)
+   
+    cutoff_date_lecturer = datetime.datetime(now.year - (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12, (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12, 1)
     lecturer_comments_count = (
         LecturerUserComment.query(session=db.session)
         .filter(
@@ -65,16 +63,15 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             LecturerUserComment.update_ts >= cutoff_date_lecturer,
         )
         .count()
-    )
-
-    if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
-        raise TooManyCommentsToLecturer(
-            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
         )
+
+        if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
+            raise TooManyCommentsToLecturer(settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT)
+            
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
 
-    create_ts = current_month_start
+    create_ts = datetime.datetime(now.year, now.month, 1)
     LecturerUserComment.create(
         session=db.session,
         lecturer_id=lecturer_id,
