@@ -29,13 +29,15 @@ class AlreadyExists(RatingAPIError):
 
 
 class TooManyCommentRequests(RatingAPIError):
-    delay_time: datetime.timedelta
+    frequency: int
+    limit: int
 
-    def __init__(self, dtime: datetime.timedelta):
-        self.delay_time = dtime
+    def __init__(self, frequency: int, limit: int):
+        self.frequency = frequency
+        self.limit = limit
         super().__init__(
-            f'Too many comment requests. Delay: {dtime}',
-            f'Слишком много попыток оставить комментарий. Задержка: {dtime}',
+            f'Too many comment requests. Allowed: {limit} comments per {frequency} months.',
+            f'Слишком много попыток оставить комментарий. Разрешено: {limit} комментариев за {frequency} месяцев.',
         )
 
 
