@@ -56,6 +56,7 @@ class CommentImport(Base):
             raise WrongMark()
         return value
 
+
 class CommentImportAll(Base):
     comments: list[CommentImport]
 
