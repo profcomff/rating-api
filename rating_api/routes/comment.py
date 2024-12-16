@@ -6,7 +6,7 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
+from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
@@ -24,6 +24,8 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Для создания комментария нужно быть авторизованным
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
     user_comments: list[LecturerUserComment] = (
@@ -41,8 +43,14 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
-    LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
-
+    create_ts = datetime.datetime(now.year, now.month, 1)
+    LecturerUserComment.create(
+        session=db.session,
+        lecturer_id=lecturer_id,
+        user_id=user.get('id'),
+        create_ts=create_ts,
+        update_ts=create_ts,
+    )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
 
@@ -138,7 +146,7 @@ async def get_comments(
     result.comments = result.comments[offset : limit + offset]
 
     if "create_ts" in order_by:
-        result.comments.sort(key=lambda comment: comment.create_ts)
+        result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
     return result
