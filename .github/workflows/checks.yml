@@ -47,6 +47,9 @@ jobs:
           remove-link-from-badge: false
           junitxml-path: ./pytest.xml
           junitxml-title: Summary
+      - name: Fail on pytest errors
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
   linting:
     runs-on: ubuntu-latest
     steps:
