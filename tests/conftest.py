@@ -97,7 +97,7 @@ def lecturers(dbsession):
         for fname, lname, mname, timetable_id in lecturers_data
     ]
     lecturers.append(
-        Lecturer(first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=3)
+        Lecturer(first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
     )
     lecturers[-1].is_deleted = True
     for lecturer in lecturers:
