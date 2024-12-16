@@ -26,6 +26,8 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
+    if user.get("id") < 4:
+        raise ForbiddenAction(Comment)  # malicious users
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
