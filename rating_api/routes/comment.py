@@ -182,6 +182,7 @@ async def get_comments(
         result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
+    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     return result
 
 
