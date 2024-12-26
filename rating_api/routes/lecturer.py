@@ -135,7 +135,7 @@ async def get_lecturers(
                 if comment.review_status is ReviewStatus.APPROVED
             ]
             if "comments" in info and approved_comments:
-                lecturer_to_result.comments = approved_comments
+                lecturer_to_result.comments = sorted(approved_comments, key=lambda comment: comment.create_ts, reverse=True)
             if "mark" in info and approved_comments:
                 lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
                     approved_comments
