@@ -18,9 +18,9 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
+async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth(scopes=["rating.comment.create"]))) -> CommentGet:
     """
-    Scopes: `["rating.comment.import"]`
+    Scopes: `["rating.comment.create"<, "rating.comment.import">]`
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
 
