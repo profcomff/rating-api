@@ -11,7 +11,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Init daemon.json
-        run: touch /etc/docker/daemon.json
+        run: sudo touch /etc/docker/daemon.json
       - name: Set up docker
         uses: docker-practice/actions-setup-docker@master
       - name: Run postgres
