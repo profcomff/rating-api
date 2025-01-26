@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     '''Temp settings'''
 
     API_URL: str = "https://api.test.profcomff.com/"
-    FIRST_COMMENT_ACHIEVEMENT_ID: int = 1
+    FIRST_COMMENT_ACHIEVEMENT_ID: int = 12
     ACHIEVEMENT_GIVE_TOKEN: str = ""
 
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
