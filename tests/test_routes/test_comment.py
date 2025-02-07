@@ -265,7 +265,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
                 "mark_clarity": 1,
                 "mark_freebie": 1,
             },
-            status.HTTP_426_UPGRADE_REQUIRED,
+            status.HTTP_409_CONFLICT,
         ),
         (  # НЕизмененным перелано одно поле
             {
@@ -275,7 +275,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
                 "mark_clarity": 2,
                 "mark_freebie": 1,
             },
-            status.HTTP_426_UPGRADE_REQUIRED,
+            status.HTTP_409_CONFLICT,
         ),
     ],
 )

@@ -220,7 +220,7 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     update_data = comment_update.model_dump(exclude_unset=True)
 
     # Если не передано ни одного параметра
-    if not update_comment:
+    if not update_data:
         raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
 
     # Проверяем, есть ли неизмененные поля
