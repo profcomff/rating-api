@@ -216,25 +216,30 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     if comment.user_id != user.get("id") or comment.user_id is None:
         raise ForbiddenAction(Comment)
 
+    # Получаем только переданные для обновления поля
+    update_data = comment_update.model_dump(exclude_unset=True)
+
     # Если не передано ни одного параметра
-    if not comment_update.model_dump(exclude_unset=True):
+    if not update_comment:
         raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
 
-    # Если хоть одно поле было передано неизменным
-    if set(comment.__dict__.items()).intersection(set(comment_update.model_dump(exclude_unset=True).items())):
-        raise HTTPException(status_code=426, detail="No changes detected")  # 426
+    # Проверяем, есть ли неизмененные поля
+    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
+    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
 
-    # Проверить поле update_ts create comment на null
-    return CommentGet.model_validate(
-        Comment.update(
-            session=db.session,
-            id=uuid,
-            # Исключаем атрибуты, котрые не переданы
-            **comment_update.model_dump(exclude_unset=True),
-            update_ts=datetime.datetime.utcnow(),
-            review_status=ReviewStatus.PENDING,
-        )
+    if unchanged_fields:
+        raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
+
+    # Обновление комментария
+    updated_comment = Comment.update(
+        session=db.session,
+        id=uuid,
+        **update_data,
+        update_ts=datetime.datetime.utcnow(),
+        review_status=ReviewStatus.PENDING,
     )
+
+    return CommentGet.model_validate(updated_comment)
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
