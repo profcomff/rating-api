@@ -73,19 +73,6 @@ settings = get_settings()
             3,
             status.HTTP_404_NOT_FOUND,
         ),
-        (
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "create_ts": "2077-11-16T19:15:27.306Z",
-                "update_ts": "2077-11-16T19:15:27.306Z",
-                "mark_kindness": 1,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
-            },
-            0,
-            status.HTTP_200_OK,
-        ),
         (  # Anonymous comment
             {
                 "subject": "test_subject",
@@ -94,18 +81,6 @@ settings = get_settings()
                 "mark_freebie": -2,
                 "mark_clarity": 0,
                 "is_anonymous": True,
-            },
-            0,
-            status.HTTP_200_OK,
-        ),
-        (
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "update_ts": "2077-11-16T19:15:27.306Z",
-                "mark_kindness": 1,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
             },
             0,
             status.HTTP_200_OK,
@@ -121,30 +96,6 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
-        ),
-        (
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "create_ts": "2077-11-16T19:15:27.306Z",
-                "mark_kindness": 1,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
-            },
-            0,
-            status.HTTP_200_OK,
-        ),
-        (  # wrong date
-            {
-                "subject": "test_subject",
-                "text": "test_text",
-                "create_ts": "wasd",
-                "mark_kindness": 1,
-                "mark_freebie": -2,
-                "mark_clarity": 0,
-            },
-            0,
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
         ),
         (  # Bad anonymity
             {

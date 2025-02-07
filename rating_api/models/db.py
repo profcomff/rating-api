@@ -79,7 +79,7 @@ class Comment(BaseDbModel):
     user_id: Mapped[int] = mapped_column(Integer, nullable=True)
     create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    subject: Mapped[str] = mapped_column(String, nullable=False)
+    subject: Mapped[str] = mapped_column(String, nullable=True)
     text: Mapped[str] = mapped_column(String, nullable=True)
     mark_kindness: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_freebie: Mapped[int] = mapped_column(Integer, nullable=False)

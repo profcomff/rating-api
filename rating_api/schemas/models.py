@@ -12,7 +12,7 @@ class CommentGet(Base):
     user_id: int | None = None
     create_ts: datetime.datetime
     update_ts: datetime.datetime
-    subject: str
+    subject: str | None = None
     text: str
     mark_kindness: int
     mark_freebie: int
@@ -52,6 +52,15 @@ class CommentUpdate(Base):
         if value not in [-2, -1, 0, 1, 2]:
             raise WrongMark()
         return value
+
+
+class CommentImport(CommentPost):
+    lecturer_id: int
+    subject: str | None = None
+
+
+class CommentImportAll(Base):
+    comments: list[CommentImport]
 
 
 class CommentGetAll(Base):

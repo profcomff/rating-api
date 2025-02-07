@@ -10,7 +10,10 @@ class Settings(BaseSettings):
 
     DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
     ROOT_PATH: str = '/' + os.getenv("APP_NAME", "")
-    COMMENT_CREATE_FREQUENCY_IN_MINUTES: int = 1
+    COMMENT_FREQUENCY_IN_MONTH: int = 10
+    COMMENT_LECTURER_FREQUENCE_IN_MONTH: int = 6
+    COMMENT_LIMIT: int = 20
+    COMMENT_TO_LECTURER_LIMIT: int = 5
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']

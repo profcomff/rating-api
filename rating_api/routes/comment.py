@@ -6,10 +6,10 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests
+from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentPost, CommentUpdate
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost, CommentUpdate
 from rating_api.settings import Settings, get_settings
 
 
@@ -27,6 +27,8 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
     lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
     if not lecturer:
         raise ObjectNotFound(Lecturer, lecturer_id)
 
@@ -35,23 +37,53 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         raise ForbiddenAction(Comment)
 
     if not has_create_scope:
-        user_comments: list[LecturerUserComment] = (
-            LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
+        # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
+        date_count = datetime.datetime(
+            now.year + (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12,
+            (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12,
+            1,
         )
-        for user_comment in user_comments:
-            if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
-                minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
-            ):
-                raise TooManyCommentRequests(
-                    dtime=user_comment.update_ts
-                    + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                    - datetime.datetime.utcnow()
-                )
+        user_comments_count = (
+            LecturerUserComment.query(session=db.session)
+            .filter(
+                LecturerUserComment.user_id == user.get("id"),
+                LecturerUserComment.update_ts >= date_count,
+            )
+            .count()
+        )
+        if user_comments_count >= settings.COMMENT_LIMIT:
+            raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
+
+        # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
+        cutoff_date_lecturer = datetime.datetime(
+            now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
+            (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
+            1,
+        )
+        lecturer_comments_count = (
+            LecturerUserComment.query(session=db.session)
+            .filter(
+                LecturerUserComment.user_id == user.get("id"),
+                LecturerUserComment.lecturer_id == lecturer_id,
+                LecturerUserComment.update_ts >= cutoff_date_lecturer,
+            )
+            .count()
+        )
+        if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
+            raise TooManyCommentsToLecturer(
+                settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
+            )
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
-    LecturerUserComment.create(session=db.session, lecturer_id=lecturer_id, user_id=user.get('id'))
-
+    create_ts = datetime.datetime(now.year, now.month, 1)
+    LecturerUserComment.create(
+        session=db.session,
+        lecturer_id=lecturer_id,
+        user_id=user.get('id'),
+        create_ts=create_ts,
+        update_ts=create_ts,
+    )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
 
@@ -63,6 +95,26 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         review_status=ReviewStatus.PENDING,
     )
     return CommentGet.model_validate(new_comment)
+
+
+@comment.post('/import', response_model=CommentGetAll)
+async def import_comments(
+    comments_info: CommentImportAll, _=Depends(UnionAuth(scopes=["rating.comment.import"]))
+) -> CommentGetAll:
+    """
+    Scopes: `["rating.comment.import"]`
+    Создает комментарии в базе данных RatingAPI
+    """
+    number_of_comments = len(comments_info.comments)
+    result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
+    for comment_info in comments_info.comments:
+        new_comment = Comment.create(
+            session=db.session,
+            **comment_info.model_dump(exclude={"is_anonymous"}),
+            review_status=ReviewStatus.APPROVED,
+        )
+        result.comments.append(new_comment)
+    return result
 
 
 @comment.get("/{uuid}", response_model=CommentGet)
@@ -127,9 +179,10 @@ async def get_comments(
     result.comments = result.comments[offset : limit + offset]
 
     if "create_ts" in order_by:
-        result.comments.sort(key=lambda comment: comment.create_ts)
+        result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
+    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     return result
 
 
