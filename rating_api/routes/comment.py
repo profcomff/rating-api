@@ -1,4 +1,5 @@
 import datetime
+import re
 from typing import Literal
 from uuid import UUID
 
@@ -6,7 +7,14 @@ from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
+from rating_api.exceptions import (
+    CommentTooLong,
+    ForbiddenAction,
+    ForbiddenSymbol,
+    ObjectNotFound,
+    TooManyCommentRequests,
+    TooManyCommentsToLecturer,
+)
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
@@ -73,6 +81,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             raise TooManyCommentsToLecturer(
                 settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
             )
+
+        if len(comment_info.text) >= settings.MAX_COMMENT_LENGTH:
+            raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+
+        if re.search(r"^[a-zA-Zа-яА-Я\d_\-. \n]*$", comment_info.text) is None:
+            raise ForbiddenSymbol()
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
