@@ -85,7 +85,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
             raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
 
-        if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-. \n]*$", comment_info.text) is None:
+        if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
             raise ForbiddenSymbol()
 
     # Сначала добавляем с user_id, который мы получили при авторизации,

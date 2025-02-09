@@ -130,7 +130,8 @@ settings = get_settings()
                 "subject": "test_subject",
                 "text": """ABCDEFGHIJKLMNOPQRSTUVWXYZ
                         abcdefghijklmnopqrstuvwxyz.,!?-
-                        абвгдежзийклмнопрстуфхцчшщъыьэюя1234567890""",
+                        абвгдежзийклмнопрстуфхцчшщъыьэюя1234567890
+                        \"\'[]{}`~<>^@#№$%;:&*()+=\\/""",
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,

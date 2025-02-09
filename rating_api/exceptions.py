@@ -76,6 +76,6 @@ class CommentTooLong(RatingAPIError):
 class ForbiddenSymbol(RatingAPIError):
     def __init__(self):
         super().__init__(
-            f"The comment contains forbidden symbols. Letters of English and Russian languages, numbers, . and - are allowed",
-            f"Комментарий содержит запрещенный символ. Разрешены буквы английского и русского языков, цифры, . и -",
+            f"The comment contains forbidden symbols. Letters of English and Russian languages, numbers and punctuation marks are allowed",
+            f"Комментарий содержит запрещенный символ. Разрешены буквы английского и русского языков, цифры и знаки препинания",
         )
