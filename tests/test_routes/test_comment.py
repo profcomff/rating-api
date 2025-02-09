@@ -156,7 +156,7 @@ settings = get_settings()
         (  # long comment
             {
                 "subject": "test_subject",
-                "text": 'a'*3001,
+                "text": 'a' * 3001,
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
@@ -168,7 +168,7 @@ settings = get_settings()
         (  # long comment but not that long
             {
                 "subject": "test_subject",
-                "text": 'a'*3000,
+                "text": 'a' * 3000,
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
