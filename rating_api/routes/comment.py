@@ -160,7 +160,7 @@ async def get_comments(
     user_id: int | None = None,
     order_by: list[Literal["create_ts"]] = Query(default=[]),
     unreviewed: bool = False,
-    user=Depends(UnionAuth(scopes=['rating.comment.review'], auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(auto_error=False, allow_none=True)),
 ) -> CommentGetAll:
     """
     Scopes: `["rating.comment.review"]`
@@ -193,7 +193,7 @@ async def get_comments(
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
-        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
             result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
         else:
             raise ForbiddenAction(Comment)
