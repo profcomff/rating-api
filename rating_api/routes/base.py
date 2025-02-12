@@ -1,5 +1,4 @@
 import asyncio
-import time
 import httpx
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +6,7 @@ from fastapi_sqlalchemy import DBSessionMiddleware
 
 # from auth_lib.fastapi import UnionAuth
 
-from rating_api import __version__
+from rating_api import __version__, LOGGING_MARKETING_URL
 from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
 from rating_api.settings import get_settings
@@ -41,36 +40,46 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
-LOGGING_URL = (
-    settings.ROOT_PATH if __version__ != 'dev' else 'http://localhost:8080/v1/action'
-)  # Заменить на рабочие ссылки
-
 async def send_log(log_data):
     """Отправляем лог на внешний сервис асинхронно"""
-    async with httpx.AsyncClient(timeout=15) as client:
+    async with httpx.AsyncClient() as client:
         try:
-            await client.post(LOGGING_URL, json=log_data)
+            await client.post(LOGGING_MARKETING_URL, json=log_data)
         except Exception as log_error:
             print(f"Ошибка при отправке логов: {log_error}")
 
+async def get_request_body(request: Request) -> tuple[Request, str]:
+    """Читает тело запроса и возвращает новый request и тело в виде JSON-строки."""
+    body = await request.body()
+    json_body = body.decode("utf-8") if body else "{}"
+
+    async def new_stream():
+        yield body
+
+    return Request(request.scope, receive=new_stream()), json_body
+
+async def log_request(request: Request, status_code: int, json_body: str):
+    """Формирует лог и отправляет его в асинхронную задачу."""
+    log_data = {
+        "user_id": -2,  # UnionAuth()(request).get('id')
+        "action": request.method,
+        "additional_data": f"status_code: {status_code}, auth_user_id: {2323423}, request: {json_body}",
+        "path_from": app.root_path,
+        "path_to": request.url.path,
+    }
+    asyncio.create_task(send_log(log_data))
 
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
+    """Основной middleware, который логирует запрос и восстанавливает тело."""
     try:
-        response: Response = await call_next(request)  # Выполняем сам запрос
+        request, json_body = await get_request_body(request)  # Получаем тело и восстанавливаем request
+        response: Response = await call_next(request)
         status_code = response.status_code
-    except Exception as e:
-        status_code = 500  # Если произошла ошибка, ставим 500
-        response = Response(content="Internal server error", status_code=500)  # Что делать с сообщением ошибки?
+    except Exception:
+        status_code = 500
+        response = Response(content="Internal server error", status_code=500)
 
-    log_data = {
-        "user_id": 0,  # UnionAuth()(request).get('id')
-        "action": "string",
-        "additional_data": f"method: {request.method}, status_code: {status_code}",
-        "path_from": "string",
-        "path_to": app.root_path + request.url.path,
-    }
-
-    asyncio.create_task(send_log(log_data))
+    await log_request(request, status_code, json_body)  # Логируем запрос
 
     return response
