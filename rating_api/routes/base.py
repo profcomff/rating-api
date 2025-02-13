@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import httpx
 from fastapi import FastAPI, Request, Response
@@ -42,6 +43,8 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
+LOG = logging.getLogger(__name__)
+
 RETRY_DELAYS = [2, 4, 8]  # Задержки перед повторными попытками (в секундах)
 
 
@@ -52,22 +55,23 @@ async def send_log(log_data):
             try:
                 response = await client.post(LOGGING_MARKETING_URL, json=log_data)
 
-                if response.status_code < 500:
+                if response.status_code not in {408, 409, 429, 500, 502, 503, 504}:
+                    LOG.info(f"Ответ записи логов от markting status_code: {response.status_code}")
                     break  # Успешно или ошибки, которые не стоит повторять (например, неправильные данные)
 
             except httpx.HTTPStatusError as e:
-                print(f"HTTP ошибка ({e.response.status_code}): {e.response.text}")
-                print('\n\n', response.status_code, '\n\n')
+                LOG.warning(f"HTTP ошибка ({e.response.status_code}): {e.response.text}")
 
             except httpx.RequestError as e:
-                print(f"Ошибка сети: {e}")
+                LOG.warning(f"Ошибка сети: {e}")
 
             except Exception as e:
-                print(f"Неизвестная ошибка: {e}")
+                LOG.warning(f"Неизвестная ошибка: {e}")
 
             await asyncio.sleep(sleep_time)  # Ожидание перед повторной попыткой
 
-        print("Не удалось отправить лог после нескольких попыток.")  # logging
+        else:
+            LOG.warning("Не удалось отправить лог после нескольких попыток.")
 
 
 async def get_request_body(request: Request) -> tuple[Request, str]:
