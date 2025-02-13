@@ -40,13 +40,31 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
+RETRY_DELAYS = [2, 4, 8]  # Задержки перед повторными попытками (в секундах)
+
 async def send_log(log_data):
-    """Отправляем лог на внешний сервис асинхронно"""
+    """Отправляем лог на внешний сервис асинхронно с обработкой ошибок и ретраями"""
     async with httpx.AsyncClient() as client:
-        try:
-            await client.post(LOGGING_MARKETING_URL, json=log_data)
-        except Exception as log_error:
-            print(f"Ошибка при отправке логов: {log_error}")
+        for attempt, sleep_time in enumerate(RETRY_DELAYS, start = 1):
+            try:
+                response = await client.post(LOGGING_MARKETING_URL, json=log_data)
+                
+                if response.status_code < 500:
+                    break  # Успешно или ошибки, которые не стоит повторять (например, неправильные данные)
+            
+            except httpx.HTTPStatusError as e:
+                print(f"HTTP ошибка ({e.response.status_code}): {e.response.text}")
+                print('\n\n', response.status_code, '\n\n')
+                
+            except httpx.RequestError as e:
+                print(f"Ошибка сети: {e}")
+            
+            except Exception as e:
+                print(f"Неизвестная ошибка: {e}")
+
+            await asyncio.sleep(sleep_time)  # Ожидание перед повторной попыткой
+
+        print("Не удалось отправить лог после нескольких попыток.")  # logging
 
 async def get_request_body(request: Request) -> tuple[Request, str]:
     """Читает тело запроса и возвращает новый request и тело в виде JSON-строки."""
@@ -63,7 +81,7 @@ async def log_request(request: Request, status_code: int, json_body: str):
     log_data = {
         "user_id": -2,  # UnionAuth()(request).get('id')
         "action": request.method,
-        "additional_data": f"status_code: {status_code}, auth_user_id: {2323423}, request: {json_body}",
+        "additional_data": f"response_status_code: {status_code}, auth_user_id: {{}}, request: {json_body}",
         "path_from": app.root_path,
         "path_to": request.url.path,
     }
