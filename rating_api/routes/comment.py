@@ -6,9 +6,9 @@ import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-
+from sqlalchemy import select, func
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus, Like
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
 from rating_api.settings import Settings, get_settings
@@ -147,8 +147,10 @@ async def get_comment(uuid: UUID) -> CommentGet:
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
     comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    like_count = Like.query(session=db.session).filter(Like.comment_uuid == uuid).count()
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
+    comment.like_count = like_count
     return CommentGet.model_validate(comment)
 
 
@@ -179,7 +181,24 @@ async def get_comments(
 
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
     """
-    comments = Comment.query(session=db.session).all()
+    like_counts = (
+        select(Like.comment_uuid, func.count(Like.id).label('like_count'))
+        .where(Like.is_deleted == False)
+        .group_by(Like.comment_uuid)
+        .alias("like_counts")
+    )
+    # comments = (
+    #    db.session.query(Comment, func.coalesce(like_counts.c.like_count, 0).label('like_count'))
+    #   .outerjoin(like_counts, Comment.uuid == like_counts.c.comment_uuid)
+    #    .all()
+    # )
+    comments_query = (
+        select(*Comment.__table__.columns, func.coalesce(like_counts.c.like_count, 0).label('like_count'))
+        .outerjoin(like_counts, Comment.uuid == like_counts.c.comment_uuid)
+        .offset(offset)
+        .limit(limit)
+    )
+    comments = db.session.execute(comments_query).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     result = CommentGetAll(limit=limit, offset=offset, total=len(comments))

@@ -19,6 +19,7 @@ class CommentGet(Base):
     mark_clarity: int
     mark_general: float
     lecturer_id: int
+    like_count: int | None = None
 
 
 class CommentPost(Base):
@@ -96,3 +97,10 @@ class LecturerPatch(Base):
     middle_name: str | None = None
     avatar_link: str | None = None
     timetable_id: int | None = None
+
+
+class LikeGet(Base):
+    id: int
+    user_id: int
+    comment_uuid: int
+    create_ts: datetime.datetime
