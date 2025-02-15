@@ -6,16 +6,16 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
 
-from rating_api import LOGGING_MARKETING_URL, __version__
+from rating_api import __version__
 from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
-from rating_api.settings import get_settings
+from rating_api.settings import Settings, get_settings
 
 
 # from auth_lib.fastapi import UnionAuth
 
 
-settings = get_settings()
+settings: Settings = get_settings()
 app = FastAPI(
     title='Рейтинг преподавателей',
     description='Хранение и работа с рейтингом преподавателей и отзывами на них.',
@@ -43,7 +43,7 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
-LOG = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 RETRY_DELAYS = [2, 4, 8]  # Задержки перед повторными попытками (в секундах)
 
@@ -53,25 +53,25 @@ async def send_log(log_data):
     async with httpx.AsyncClient() as client:
         for attempt, sleep_time in enumerate(RETRY_DELAYS, start=1):
             try:
-                response = await client.post(LOGGING_MARKETING_URL, json=log_data)
+                response = await client.post(settings.LOGGING_MARKETING_URL, json=log_data)
 
                 if response.status_code not in {408, 409, 429, 500, 502, 503, 504}:
-                    LOG.info(f"Ответ записи логов от markting status_code: {response.status_code}")
+                    log.info(f"Ответ записи логов от markting status_code: {response.status_code}")
                     break  # Успешно или ошибки, которые не стоит повторять (например, неправильные данные)
 
             except httpx.HTTPStatusError as e:
-                LOG.warning(f"HTTP ошибка ({e.response.status_code}): {e.response.text}")
+                log.warning(f"HTTP ошибка ({e.response.status_code}): {e.response.text}")
 
             except httpx.RequestError as e:
-                LOG.warning(f"Ошибка сети: {e}")
+                log.warning(f"Ошибка сети: {e}")
 
             except Exception as e:
-                LOG.warning(f"Неизвестная ошибка: {e}")
+                log.warning(f"Неизвестная ошибка: {e}")
 
             await asyncio.sleep(sleep_time)  # Ожидание перед повторной попыткой
 
         else:
-            LOG.warning("Не удалось отправить лог после нескольких попыток.")
+            log.warning("Не удалось отправить лог после нескольких попыток.")
 
 
 async def get_request_body(request: Request) -> tuple[Request, str]:
