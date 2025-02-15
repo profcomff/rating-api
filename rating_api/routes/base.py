@@ -13,7 +13,7 @@ from rating_api.routes.lecturer import lecturer
 from rating_api.settings import Settings, get_settings
 
 
-# from auth_lib.fastapi import UnionAuth
+from auth_lib.fastapi import UnionAuth
 
 
 settings: Settings = get_settings()
@@ -76,7 +76,7 @@ async def send_log(log_data):
 
 
 async def get_request_body(request: Request) -> tuple[Request, str]:
-    """Читает тело запроса и возвращает новый request и тело в виде JSON-строки."""
+    """Читает тело запроса и возвращает новый request и тело в виде JSON."""
     body = await request.body()
     json_body = json.loads(body) if body else {}  # В json(dict) from byte string
 
@@ -85,16 +85,26 @@ async def get_request_body(request: Request) -> tuple[Request, str]:
 
     return Request(request.scope, receive=new_stream()), json_body
 
+async def get_user_id(request: Request):
+    """Получает user_id из UnionAuth"""
+    try:
+        user_id = UnionAuth()(request).get('id')
+    except Exception as e:
+        user_id = "Not auth"  # Или лучше -1? чтобы типизация :int была?
+        log.error(e)
+    
+    return user_id
 
 async def log_request(request: Request, status_code: int, json_body: dict):
     """Формирует лог и отправляет его в асинхронную задачу."""
 
     additional_data = {"response_status_code": status_code, 
-                       "auth_user_id": 0, 
+                       "auth_user_id": await get_user_id(request),
+                       "query": request.url.query,
                        "request": json_body
                        }
     log_data = {
-        "user_id": -2,  # UnionAuth()(request).get('id')
+        "user_id": -2,
         "action": request.method,
         "additional_data": json.dumps(additional_data),
         "path_from": app.root_path,
