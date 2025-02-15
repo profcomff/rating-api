@@ -90,7 +90,7 @@ async def get_user_id(request: Request):
         user_id = UnionAuth()(request).get('id')
     except Exception as e:
         user_id = "Not auth"  # Или лучше -1? чтобы типизация :int была?
-        log.error(e)
+        log.error(f"USER_AUTH: {e}")
 
     return user_id
 
