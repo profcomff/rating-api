@@ -102,5 +102,5 @@ class LecturerPatch(Base):
 class LikeGet(Base):
     id: int
     user_id: int
-    comment_uuid: int
+    comment_uuid: UUID
     create_ts: datetime.datetime

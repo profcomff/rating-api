@@ -6,9 +6,11 @@ import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from sqlalchemy import select, func
+from sqlalchemy import func, select
+from sqlalchemy.orm import aliased
+
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus, Like
+from rating_api.models import Comment, CommentLike, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
 from rating_api.settings import Settings, get_settings
@@ -141,19 +143,6 @@ async def import_comments(
     return result
 
 
-@comment.get("/{uuid}", response_model=CommentGet)
-async def get_comment(uuid: UUID) -> CommentGet:
-    """
-    Возвращает комментарий по его UUID в базе данных RatingAPI
-    """
-    comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
-    like_count = Like.query(session=db.session).filter(Like.comment_uuid == uuid).count()
-    if comment is None:
-        raise ObjectNotFound(Comment, uuid)
-    comment.like_count = like_count
-    return CommentGet.model_validate(comment)
-
-
 @comment.get("", response_model=CommentGetAll)
 async def get_comments(
     limit: int = 10,
@@ -169,63 +158,64 @@ async def get_comments(
 
     `limit` - максимальное количество возвращаемых комментариев
 
-    `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
-    Если без смещения возвращается комментарий с условным номером N,
-    то при значении offset = X будет возвращаться комментарий с номером N + X
+    `offset` - смещение, определяющее, с какого по порядку комментария начинать выборку.
 
-    `order_by` - возможное значение `'create_ts'` - возвращается список комментариев отсортированных по времени создания
+    `order_by` - возможное значение `'create_ts'` - возвращается список комментариев, отсортированных по времени создания.
 
-    `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
+    `lecturer_id` - вернет все комментарии для преподавателя с конкретным id.
 
-    `user_id` - вернет все комментарии пользователя с конкретным id
+    `user_id` - вернет все комментарии пользователя с конкретным id.
 
     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
     """
+    # Subquery чтобы посчитать лайки
     like_counts = (
-        select(Like.comment_uuid, func.count(Like.id).label('like_count'))
-        .where(Like.is_deleted == False)
-        .group_by(Like.comment_uuid)
+        select(CommentLike.comment_uuid, func.count(CommentLike.id).label('like_count'))
+        .where(CommentLike.is_deleted == False)
+        .group_by(CommentLike.comment_uuid)
         .alias("like_counts")
     )
-    # comments = (
-    #    db.session.query(Comment, func.coalesce(like_counts.c.like_count, 0).label('like_count'))
-    #   .outerjoin(like_counts, Comment.uuid == like_counts.c.comment_uuid)
-    #    .all()
-    # )
-    comments_query = (
-        select(*Comment.__table__.columns, func.coalesce(like_counts.c.like_count, 0).label('like_count'))
-        .outerjoin(like_counts, Comment.uuid == like_counts.c.comment_uuid)
-        .offset(offset)
-        .limit(limit)
+    # получаем комменты с лайками к ним
+    comments_query = select(Comment, func.coalesce(like_counts.c.like_count, 0).label('like_count')).outerjoin(
+        like_counts, Comment.uuid == like_counts.c.comment_uuid
     )
-    comments = db.session.execute(comments_query).all()
-    if not comments:
-        raise ObjectNotFound(Comment, 'all')
-    result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
-    result.comments = comments
-    if user_id is not None:
-        result.comments = [comment for comment in result.comments if comment.user_id == user_id]
 
     if lecturer_id is not None:
-        result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
+        comments_query = comments_query.where(Comment.lecturer_id == lecturer_id)
+
+    if user_id is not None:
+        comments_query = comments_query.where(Comment.user_id == user_id)
 
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
-        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-            result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
-        else:
+        if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
             raise ForbiddenAction(Comment)
+        comments_query = comments_query.where(Comment.review_status == ReviewStatus.PENDING)
     else:
-        result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
-
-    result.comments = result.comments[offset : limit + offset]
+        comments_query = comments_query.where(Comment.review_status == ReviewStatus.APPROVED)
 
     if "create_ts" in order_by:
-        result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
-    result.total = len(result.comments)
-    result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
-    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
+        comments_query = comments_query.order_by(Comment.create_ts.desc())
+
+    comments_query = comments_query.offset(offset).limit(limit)
+
+    comments_with_likes = db.session.execute(comments_query).all()
+
+    if not comments_with_likes:
+        raise ObjectNotFound(Comment, 'all')
+    # добавляем лайки к комментам
+    comments = []
+    for comment, like_count in comments_with_likes:
+        comment.like_count = like_count
+        comments.append(CommentGet.model_validate(comment))
+
+    result = CommentGetAll(
+        limit=limit,
+        offset=offset,
+        total=len(comments),
+        comments=comments,
+    )
     return result
 
 
