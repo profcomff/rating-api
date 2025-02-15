@@ -5,6 +5,7 @@ from fastapi_sqlalchemy import DBSessionMiddleware
 from rating_api import __version__
 from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
+from rating_api.routes.like import like
 from rating_api.settings import get_settings
 
 
@@ -36,3 +37,4 @@ app.add_middleware(
 
 app.include_router(lecturer)
 app.include_router(comment)
+app.include_router(like)
