@@ -37,6 +37,7 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """Основной middleware, который логирует запрос и восстанавливает тело."""

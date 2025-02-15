@@ -1,10 +1,11 @@
 import asyncio
 import json
 import logging
-from fastapi import Request
-import httpx
 
+import httpx
 from auth_lib.fastapi import UnionAuth
+from fastapi import Request
+
 from rating_api.settings import Settings, get_settings
 
 
@@ -69,7 +70,7 @@ async def log_request(request: Request, status_code: int, json_body: dict):
     additional_data = {
         "response_status_code": status_code,
         "auth_user_id": await get_user_id(request),
-        "query": request.url.path+"?"+request.url.query,
+        "query": request.url.path + "?" + request.url.query,
         "request": json_body,
     }
     log_data = {
