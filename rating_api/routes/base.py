@@ -3,6 +3,7 @@ import json
 import logging
 
 import httpx
+from auth_lib.fastapi import UnionAuth
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_sqlalchemy import DBSessionMiddleware
@@ -11,9 +12,6 @@ from rating_api import __version__
 from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
 from rating_api.settings import Settings, get_settings
-
-
-from auth_lib.fastapi import UnionAuth
 
 
 settings: Settings = get_settings()
@@ -85,6 +83,7 @@ async def get_request_body(request: Request) -> tuple[Request, str]:
 
     return Request(request.scope, receive=new_stream()), json_body
 
+
 async def get_user_id(request: Request):
     """Получает user_id из UnionAuth"""
     try:
@@ -92,17 +91,19 @@ async def get_user_id(request: Request):
     except Exception as e:
         user_id = "Not auth"  # Или лучше -1? чтобы типизация :int была?
         log.error(e)
-    
+
     return user_id
+
 
 async def log_request(request: Request, status_code: int, json_body: dict):
     """Формирует лог и отправляет его в асинхронную задачу."""
 
-    additional_data = {"response_status_code": status_code, 
-                       "auth_user_id": await get_user_id(request),
-                       "query": request.url.query,
-                       "request": json_body
-                       }
+    additional_data = {
+        "response_status_code": status_code,
+        "auth_user_id": await get_user_id(request),
+        "query": request.url.query,
+        "request": json_body,
+    }
     log_data = {
         "user_id": -2,
         "action": request.method,
