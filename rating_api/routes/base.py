@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import httpx
@@ -77,7 +78,7 @@ async def send_log(log_data):
 async def get_request_body(request: Request) -> tuple[Request, str]:
     """Читает тело запроса и возвращает новый request и тело в виде JSON-строки."""
     body = await request.body()
-    json_body = body.decode("utf-8") if body else "{}"
+    json_body = json.loads(body) if body else {}  # В json(dict) from byte string
 
     async def new_stream():
         yield body
@@ -85,12 +86,17 @@ async def get_request_body(request: Request) -> tuple[Request, str]:
     return Request(request.scope, receive=new_stream()), json_body
 
 
-async def log_request(request: Request, status_code: int, json_body: str):
+async def log_request(request: Request, status_code: int, json_body: dict):
     """Формирует лог и отправляет его в асинхронную задачу."""
+
+    additional_data = {"response_status_code": status_code, 
+                       "auth_user_id": 0, 
+                       "request": json_body
+                       }
     log_data = {
         "user_id": -2,  # UnionAuth()(request).get('id')
         "action": request.method,
-        "additional_data": f"response_status_code: {status_code}, auth_user_id: {{}}, request: {json_body}",
+        "additional_data": json.dumps(additional_data),
         "path_from": app.root_path,
         "path_to": request.url.path,
     }
