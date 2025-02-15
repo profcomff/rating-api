@@ -143,6 +143,19 @@ async def import_comments(
     return result
 
 
+@comment.get("/{uuid}", response_model=CommentGet)
+async def get_comment(uuid: UUID) -> CommentGet:
+    """
+    Возвращает комментарий по его UUID в базе данных RatingAPI
+    """
+    comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    like_count = CommentLike.query(session=db.session).filter(CommentLike.comment_uuid == uuid).count()
+    if comment is None:
+        raise ObjectNotFound(Comment, uuid)
+    comment.like_count = like_count
+    return CommentGet.model_validate(comment)
+
+
 @comment.get("", response_model=CommentGetAll)
 async def get_comments(
     limit: int = 10,
