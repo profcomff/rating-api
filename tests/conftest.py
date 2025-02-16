@@ -81,6 +81,26 @@ def unreviewed_comment(dbsession, lecturer):
     dbsession.commit()
 
 
+@pytest.fixture
+def nonanonymous_comment(dbsession, lecturer):
+    _comment = Comment(
+        subject="subject",
+        text="comment",
+        mark_kindness=1,
+        mark_clarity=1,
+        mark_freebie=1,
+        lecturer_id=lecturer.id,
+        review_status=ReviewStatus.APPROVED,
+        user_id=0,
+    )
+    dbsession.add(_comment)
+    dbsession.commit()
+    yield _comment
+    dbsession.refresh(_comment)
+    dbsession.delete(_comment)
+    dbsession.commit()
+
+
 @pytest.fixture(scope='function')
 def lecturers(dbsession):
     """
