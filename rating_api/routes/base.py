@@ -48,7 +48,7 @@ async def add_process_time_header(request: Request, call_next):
     except Exception:
         status_code = 500
         response = Response(content="Internal server error", status_code=500)
-
-    await log_request(request, status_code, json_body)  # Логируем запрос
+    if __version__ != "dev":  # Локально не отправляем логи в маркетинг
+        await log_request(request, status_code, json_body)  # Логируем запрос
 
     return response
