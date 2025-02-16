@@ -74,7 +74,7 @@ async def log_request(request: Request, status_code: int, json_body: dict):
         "request": json_body,
     }
     log_data = {
-        "user_id": -2,
+        "user_id": -3,
         "action": request.method,
         "additional_data": json.dumps(additional_data),
         "path_from": '',  # app.root_path
