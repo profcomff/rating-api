@@ -231,7 +231,6 @@ async def review_comment(
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
 
-
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
     uuid: UUID,
@@ -248,16 +247,10 @@ async def delete_comment(
     if check_comment is None:
         raise ObjectNotFound(Comment, uuid)
     if comment.is_anonymous:
-        raise HTTPException(
-            status_code=403,
-            detail="Anonymous comments cannot be deleted"
-        )
+        raise HTTPException(status_code=403, detail="Anonymous comments cannot be deleted")
 
     if comment.user_id != current_user.id:
-        raise HTTPException(
-            status_code=403,
-            detail="You can only delete your own comments"
-        )
+        raise HTTPException(status_code=403, detail="You can only delete your own comments")
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
