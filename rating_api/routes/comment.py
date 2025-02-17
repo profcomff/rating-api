@@ -242,17 +242,27 @@ async def delete_comment(
 
     Удаляет комментарий по его UUID в базе данных RatingAPI
     """
-    comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    comment = (
+        Comment.query(session=db.session)
+        .filter(Comment.uuid == uuid)
+        .one_or_none()
+    )
     check_comment = Comment.get(session=db.session, id=uuid)
     if check_comment is None:
         raise ObjectNotFound(Comment, uuid)
     if comment.is_anonymous:
-        raise HTTPException(status_code=403, detail="Anonymous comments cannot be deleted")
+        raise HTTPException(
+            status_code=403, detail="Anonymous comments cannot be deleted"
+        )
 
     if comment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only delete your own comments")
+        raise HTTPException(
+            status_code=403, detail="You can only delete your own comments"
+        )
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
-        status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
+        status="Success",
+        message="Comment has been deleted",
+        ru="Комментарий удален из RatingAPI",
     )
