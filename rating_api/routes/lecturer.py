@@ -9,6 +9,7 @@ from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
+from rating_api.utils.mark import calc_weighted_mark
 
 
 lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
@@ -65,6 +66,9 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
             result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(approved_comments)
             result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
             result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(approved_comments)
+            result.mark_weighted = calc_weighted_mark(
+                result.mark_general, len(approved_comments), Lecturer.mean_mark_general()
+            )
         if approved_comments:
             result.subjects = list({comment.subject for comment in approved_comments})
     return result
@@ -76,7 +80,8 @@ async def get_lecturers(
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
     order_by: str = Query(
-        enum=["mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"], default="mark_general"
+        enum=["mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"],
+        default="mark_weighted",
     ),
     subject: str = Query(''),
     name: str = Query(''),
@@ -87,7 +92,7 @@ async def get_lecturers(
 
     `offset` - нижняя граница получения преподавателей, т.е. если по дефолту первым возвращается преподаватель с условным номером N, то при наличии ненулевого offset будет возвращаться преподаватель с номером N + offset
 
-    `order_by` - возможные значения `"mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"`.
+    `order_by` - возможные значения `"mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"`.
     Если передано `'last_name'` - возвращается список преподавателей отсортированных по алфавиту по фамилиям
     Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
 
@@ -113,9 +118,11 @@ async def get_lecturers(
         .filter(Lecturer.search_by_subject(subject))
         .filter(Lecturer.search_by_name(name))
         .order_by(
-            Lecturer.order_by_mark(order_by, asc_order)
-            if "mark" in order_by
-            else Lecturer.order_by_name(order_by, asc_order)
+            *(
+                Lecturer.order_by_mark(order_by, asc_order)
+                if "mark" in order_by
+                else Lecturer.order_by_name(order_by, asc_order)
+            )
         )
     )
 
@@ -125,6 +132,8 @@ async def get_lecturers(
     if not lecturers:
         raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
+    if "mark" in info:
+        mean_mark_general = Lecturer.mean_mark_general()
     for db_lecturer in lecturers:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
@@ -148,6 +157,9 @@ async def get_lecturers(
                 )
                 lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
                     approved_comments
+                )
+                lecturer_to_result.mark_weighted = calc_weighted_mark(
+                    lecturer_to_result.mark_general, len(approved_comments), mean_mark_general
                 )
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
