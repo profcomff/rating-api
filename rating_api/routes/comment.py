@@ -3,6 +3,7 @@ import re
 from typing import Literal
 from uuid import UUID
 
+import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
@@ -108,6 +109,29 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         user_id=user_id,
         review_status=ReviewStatus.PENDING,
     )
+
+    # Выдача аччивки юзеру за первый комментарий
+    async with aiohttp.ClientSession() as session:
+        give_achievement = True
+        async with session.get(
+            settings.API_URL + f"achievement/user/{user.get('id'):}",
+            headers={"Accept": "application/json"},
+        ) as response:
+            if response.status == 200:
+                user_achievements = await response.json()
+                for achievement in user_achievements.get("achievement", []):
+                    if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                        give_achievement = False
+                        break
+            else:
+                give_achievement = False
+        if give_achievement:
+            session.post(
+                settings.API_URL
+                + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
+                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
+            )
+
     return CommentGet.model_validate(new_comment)
 
 
@@ -196,6 +220,7 @@ async def get_comments(
         result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
+    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     return result
 
 
