@@ -236,7 +236,6 @@ async def review_comment(
 async def delete_comment(
     uuid: UUID,
     current_user=Depends(UnionAuth(auto_error=True, allow_none=False)),
-    db: Session = Depends(database.get_db),
 ):
     """
     Scopes: `["rating.comment.delete"]`
@@ -247,11 +246,16 @@ async def delete_comment(
     check_comment = Comment.get(session=db.session, id=uuid)
     if check_comment is None:
         raise ObjectNotFound(Comment, uuid)
-    if comment.is_anonymous:
-        raise HTTPException(status_code=403, detail="Anonymous comments cannot be deleted")
+    # Наличие скоупа для удаления любых комментариев
+    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in current_user.get('session_scopes', [])]
+
+    # Если нет привилегии - проверяем права обычного пользователя
+    if not has_delete_scope:
+        if comment.is_anonymous:
+            raise ForbiddenAction(Comment)
 
     if comment.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="You can only delete your own comments")
+        raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
