@@ -72,6 +72,7 @@ class LecturerGet(Base):
     mark_freebie: float | None = None
     mark_clarity: float | None = None
     mark_general: float | None = None
+    mark_weighted: float | None = None
     comments: list[CommentGet] | None = None
 
 
