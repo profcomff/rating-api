@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     COMMENT_LECTURER_FREQUENCE_IN_MONTH: int = 6
     COMMENT_LIMIT: int = 20
     COMMENT_TO_LECTURER_LIMIT: int = 5
-    MEAN_MARK_GENERAL_WEIGHT: float = 0.5
+    MEAN_MARK_GENERAL_WEIGHT: float = 0.75
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']
