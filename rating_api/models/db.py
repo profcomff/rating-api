@@ -5,6 +5,7 @@ import logging
 import uuid
 from enum import Enum
 
+from fastapi_sqlalchemy import db
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
@@ -12,12 +13,11 @@ from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
-from rating_api.settings import get_settings
+from rating_api.utils.mark import calc_weighted_mark
 
 from .base import BaseDbModel
 
 
-settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
@@ -62,16 +62,41 @@ class Lecturer(BaseDbModel):
         return response
 
     @hybrid_method
-    def order_by_mark(self, query: str, asc_order: bool) -> UnaryExpression[float]:
-        return (
-            nulls_last(func.avg(getattr(Comment, query)))
-            if asc_order
-            else nulls_last(func.avg(getattr(Comment, query)).desc())
-        )
+    def order_by_mark(
+        self, query: str, asc_order: bool
+    ) -> tuple[UnaryExpression[float], InstrumentedAttribute, InstrumentedAttribute]:
+        if "mark_weighted" in query:
+            comments_num = func.count(self.comments).filter(Comment.review_status == ReviewStatus.APPROVED)
+            lecturer_mark_general = func.avg(Comment.mark_general).filter(
+                Comment.review_status == ReviewStatus.APPROVED
+            )
+            expression = calc_weighted_mark(lecturer_mark_general, comments_num, Lecturer.mean_mark_general())
+        else:
+            expression = func.avg(getattr(Comment, query)).filter(Comment.review_status == ReviewStatus.APPROVED)
+        if not asc_order:
+            expression = expression.desc()
+        return nulls_last(expression), Lecturer.last_name, Lecturer.id
 
     @hybrid_method
-    def order_by_name(self, query: str, asc_order: bool) -> UnaryExpression[str] | InstrumentedAttribute[str]:
-        return getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()
+    def order_by_name(
+        self, query: str, asc_order: bool
+    ) -> tuple[UnaryExpression[str] | InstrumentedAttribute, InstrumentedAttribute]:
+        return (getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()), Lecturer.id
+
+    @staticmethod
+    def mean_mark_general() -> float:
+        mark_general_rows = (
+            db.session.query(func.avg(Comment.mark_general))
+            .filter(Comment.review_status == ReviewStatus.APPROVED)
+            .group_by(Comment.lecturer_id)
+            .all()
+        )
+        mean_mark_general = float(
+            sum(mark_general_row[0] for mark_general_row in mark_general_rows) / len(mark_general_rows)
+            if len(mark_general_rows) != 0
+            else 0
+        )
+        return mean_mark_general
 
 
 class Comment(BaseDbModel):

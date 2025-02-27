@@ -21,7 +21,7 @@ settings = get_settings()
         (
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
@@ -32,7 +32,7 @@ settings = get_settings()
         (
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
@@ -43,7 +43,7 @@ settings = get_settings()
         (
             {
                 "subject": "test1_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": -2,
                 "mark_freebie": -2,
                 "mark_clarity": -2,
@@ -54,7 +54,7 @@ settings = get_settings()
         (  # bad mark
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 5,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -65,7 +65,7 @@ settings = get_settings()
         (  # deleted lecturer
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -76,7 +76,7 @@ settings = get_settings()
         (  # Anonymous comment
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -88,7 +88,7 @@ settings = get_settings()
         (  # NotAnonymous comment
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -100,8 +100,7 @@ settings = get_settings()
         (  # Bad anonymity
             {
                 "subject": "test_subject",
-                "text": "test_text",
-                "create_ts": "wasd",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -112,7 +111,7 @@ settings = get_settings()
         (  # Not provided anonymity
             {
                 "subject": "test_subject",
-                "text": "test_text",
+                "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
@@ -120,6 +119,59 @@ settings = get_settings()
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+        (  # regex test
+            {
+                "subject": "test_subject",
+                "text": """ABCDEFGHIJKLMNOPQRSTUVWXYZ
+                        abcdefghijklmnopqrstuvwxyz.,!?-
+                        абвгдежзийклмнопрстуфхцчшщъыьэюя1234567890
+                        \"\'[]{}`~<>^@#№$%;:&*()+=\\/""",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+                "is_anonymous": False,
+            },
+            0,
+            status.HTTP_200_OK,
+        ),
+        (  # forbidden symbols
+            {
+                "subject": "test_subject",
+                "text": """ABCDEFGHIJKLMNOPQRSTUVWXYZ
+                        abcdefghijklmnopqrstuvwxyz.,!?-
+                        абвгдежзийк☻☺☺лмнопрстуфхцчшщъыьэюя1234567890""",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+                "is_anonymous": False,
+            },
+            0,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (  # long comment
+            {
+                "subject": "test_subject",
+                "text": 'a' * 3001,
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+                "is_anonymous": False,
+            },
+            0,
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (  # long comment but not that long
+            {
+                "subject": "test_subject",
+                "text": 'a' * 3000,
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+                "is_anonymous": False,
+            },
+            0,
+            status.HTTP_200_OK,
         ),
     ],
 )

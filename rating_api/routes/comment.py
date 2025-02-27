@@ -1,12 +1,21 @@
 import datetime
+import re
 from typing import Literal
 from uuid import UUID
 
+import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
+from rating_api.exceptions import (
+    CommentTooLong,
+    ForbiddenAction,
+    ForbiddenSymbol,
+    ObjectNotFound,
+    TooManyCommentRequests,
+    TooManyCommentsToLecturer,
+)
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost, CommentUpdate
@@ -74,6 +83,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                 settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
             )
 
+        if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
+            raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+
+        if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
+            raise ForbiddenSymbol()
+
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
     create_ts = datetime.datetime(now.year, now.month, 1)
@@ -94,6 +109,29 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         user_id=user_id,
         review_status=ReviewStatus.PENDING,
     )
+
+    # Выдача аччивки юзеру за первый комментарий
+    async with aiohttp.ClientSession() as session:
+        give_achievement = True
+        async with session.get(
+            settings.API_URL + f"achievement/user/{user.get('id'):}",
+            headers={"Accept": "application/json"},
+        ) as response:
+            if response.status == 200:
+                user_achievements = await response.json()
+                for achievement in user_achievements.get("achievement", []):
+                    if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                        give_achievement = False
+                        break
+            else:
+                give_achievement = False
+        if give_achievement:
+            session.post(
+                settings.API_URL
+                + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
+                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
+            )
+
     return CommentGet.model_validate(new_comment)
 
 
