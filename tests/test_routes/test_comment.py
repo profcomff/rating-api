@@ -97,7 +97,7 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (  # Bad anonymity
+        (   # Not provided anonymity 
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -106,9 +106,9 @@ settings = get_settings()
                 "mark_clarity": 0,
             },
             0,
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_200_OK,
         ),
-        (  # Not provided anonymity
+        (   # Bad anonymity
             {
                 "subject": "test_subject",
                 "text": "test text",
