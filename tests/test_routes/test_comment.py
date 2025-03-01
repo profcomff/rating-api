@@ -85,7 +85,7 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (   # NotAnonymous comment
+        (  # NotAnonymous comment
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -97,7 +97,7 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (   # Not provided anonymity 
+        (  # Not provided anonymity
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -108,7 +108,7 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (   # Bad anonymity
+        (  # Bad anonymity
             {
                 "subject": "test_subject",
                 "text": "test text",
