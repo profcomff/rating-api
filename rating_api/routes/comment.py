@@ -3,10 +3,16 @@ from typing import Literal
 from uuid import UUID
 
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
+from rating_api.exceptions import (
+    ForbiddenAction,
+    ObjectNotFound,
+    TooManyCommentRequests,
+    TooManyCommentsToLecturer,
+    UpdateError,
+)
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost, CommentUpdate
@@ -221,14 +227,16 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
 
     # Если не передано ни одного параметра
     if not update_data:
-        raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
+        raise UpdateError(msg="Provide any parametr.")
+        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
 
     # Проверяем, есть ли неизмененные поля
     current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
     unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
 
     if unchanged_fields:
-        raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
+        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
 
     # Обновление комментария
     updated_comment = Comment.update(

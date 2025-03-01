@@ -63,3 +63,11 @@ class WrongMark(RatingAPIError):
         super().__init__(
             f"Ratings can only take values: -2, -1, 0, 1, 2", f"Оценки могут принимать только значения: -2, -1, 0, 1, 2"
         )
+
+
+class UpdateError(RatingAPIError):
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg} Conflict with update a resource that already exists or has conflicting information.",
+            f"{msg} Конфликт с обновлением ресурса, который уже существует или имеет противоречивую информацию.",
+        )
