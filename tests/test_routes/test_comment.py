@@ -85,7 +85,7 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (  # NotAnonymous comment
+        (   # NotAnonymous comment
             {
                 "subject": "test_subject",
                 "text": "test text",
