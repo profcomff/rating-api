@@ -235,26 +235,25 @@ async def review_comment(
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
     uuid: UUID,
-    current_user=Depends(UnionAuth(auto_error=True, allow_none=False)),
+    user=Depends(UnionAuth(auto_error=True, allow_none=False)),
 ):
     """
     Scopes: `["rating.comment.delete"]`
 
     Удаляет комментарий по его UUID в базе данных RatingAPI
     """
-    comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
-    check_comment = Comment.get(session=db.session, id=uuid)
-    if check_comment is None:
+    comment = db.session.query(Comment).filter_by(uuid=uuid).one_or_none()
+    if comment is None:
         raise ObjectNotFound(Comment, uuid)
     # Наличие скоупа для удаления любых комментариев
-    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in current_user.get('session_scopes', [])]
+    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
 
     # Если нет привилегии - проверяем права обычного пользователя
     if not has_delete_scope:
         if comment.is_anonymous:
             raise ForbiddenAction(Comment)
 
-    if comment.user_id != current_user.id:
+    if comment.user_id != user.id:
         raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
