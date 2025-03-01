@@ -65,6 +65,22 @@ class WrongMark(RatingAPIError):
         )
 
 
+class CommentTooLong(RatingAPIError):
+    def __init__(self, num_symbols: int):
+        super().__init__(
+            f"The comment is too long. Maximum of {num_symbols} is allowed",
+            f"Комментарий слишком длинный. Разрешено максимум {num_symbols}",
+        )
+
+
+class ForbiddenSymbol(RatingAPIError):
+    def __init__(self):
+        super().__init__(
+            f"The comment contains forbidden symbols. Letters of English and Russian languages, numbers and punctuation marks are allowed",
+            f"Комментарий содержит запрещенный символ. Разрешены буквы английского и русского языков, цифры и знаки препинания",
+        )
+
+
 class UpdateError(RatingAPIError):
     def __init__(self, msg: str):
         super().__init__(

@@ -5,6 +5,13 @@ from pydantic import ConfigDict, PostgresDsn
 from pydantic_settings import BaseSettings
 
 
+LOGGING_MARKETING_URLS = {
+    "dev": f"http://localhost:{os.getenv('MARKETING_PORT', 8000)}/v1/action",
+    "test": "https://api.test.profcomff.com/marketing/v1/action",
+    "prod": "https://api.profcomff.com/marketing/v1/action",
+}
+
+
 class Settings(BaseSettings):
     """Application settings"""
 
@@ -14,10 +21,21 @@ class Settings(BaseSettings):
     COMMENT_LECTURER_FREQUENCE_IN_MONTH: int = 6
     COMMENT_LIMIT: int = 20
     COMMENT_TO_LECTURER_LIMIT: int = 5
+    MEAN_MARK_GENERAL_WEIGHT: float = 0.75
     CORS_ALLOW_ORIGINS: list[str] = ['*']
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: list[str] = ['*']
     CORS_ALLOW_HEADERS: list[str] = ['*']
+    MAX_COMMENT_LENGTH: int = 3000
+    LOGGING_MARKETING_URL: str = LOGGING_MARKETING_URLS.get(
+        os.getenv("APP_VERSION", "dev"), LOGGING_MARKETING_URLS["test"]
+    )
+
+    '''Temp settings'''
+
+    API_URL: str = "https://api.test.profcomff.com/"
+    FIRST_COMMENT_ACHIEVEMENT_ID: int = 12
+    ACHIEVEMENT_GIVE_TOKEN: str = ""
 
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 
