@@ -193,7 +193,6 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
             ]
         )
 
-
 @pytest.mark.parametrize(
     'review_status, response_status,is_reviewed',
     [
@@ -227,3 +226,4 @@ def test_delete_comment(client, dbsession, comment):
     assert comment.is_deleted
     response = client.get(f'{url}/{comment.uuid}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
+    

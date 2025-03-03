@@ -1,5 +1,5 @@
 import datetime
-from typing import Literal
+from typing import Literal, Union
 from uuid import UUID
 
 import aiohttp
@@ -10,7 +10,14 @@ from fastapi_sqlalchemy import db
 from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
+from rating_api.schemas.models import (
+    CommentGet,
+    CommentGetAll,
+    CommentGetAllWithStatus,
+    CommentGetWithStatus,
+    CommentImportAll,
+    CommentPost,
+)
 from rating_api.settings import Settings, get_settings
 
 
@@ -152,7 +159,7 @@ async def get_comment(uuid: UUID) -> CommentGet:
     return CommentGet.model_validate(comment)
 
 
-@comment.get("", response_model=CommentGetAll)
+@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithStatus])
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -160,10 +167,10 @@ async def get_comments(
     user_id: int | None = None,
     order_by: list[Literal["create_ts"]] = Query(default=[]),
     unreviewed: bool = False,
-    user=Depends(UnionAuth(auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.user"], auto_error=False, allow_none=True)),
 ) -> CommentGetAll:
     """
-    Scopes: `["rating.comment.review"]`
+    Scopes: `["rating.comment.user"]`
 
     `limit` - максимальное количество возвращаемых комментариев
 
@@ -182,7 +189,12 @@ async def get_comments(
     comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
+    if "rating.comment.user" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
+        result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
+        comment_validator = CommentGetWithStatus
+    else:
+        result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
+        comment_validator = CommentGet
     result.comments = comments
     if user_id is not None:
         result.comments = [comment for comment in result.comments if comment.user_id == user_id]
@@ -197,7 +209,11 @@ async def get_comments(
             "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]
             or user.get('id') == user_id
         ):
-            result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
+            result.comments = [
+                comment
+                for comment in result.comments
+                if comment.review_status is ReviewStatus.PENDING or ReviewStatus.DISMISSED
+            ]
         else:
             raise ForbiddenAction(Comment)
     else:
@@ -208,7 +224,7 @@ async def get_comments(
     if "create_ts" in order_by:
         result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
-    result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
+    result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
     result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     return result
 
