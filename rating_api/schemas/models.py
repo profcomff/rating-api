@@ -4,6 +4,7 @@ from uuid import UUID
 from pydantic import field_validator
 
 from rating_api.exceptions import WrongMark
+from rating_api.models import ReviewStatus
 from rating_api.schemas.base import Base
 
 
@@ -19,6 +20,21 @@ class CommentGet(Base):
     mark_clarity: int
     mark_general: float
     lecturer_id: int
+
+
+class CommentGetWithStatus(Base):
+    uuid: UUID
+    user_id: int | None = None
+    create_ts: datetime.datetime
+    update_ts: datetime.datetime
+    subject: str | None = None
+    text: str
+    mark_kindness: int
+    mark_freebie: int
+    mark_clarity: int
+    mark_general: float
+    lecturer_id: int
+    review_status: ReviewStatus
 
 
 class CommentPost(Base):
@@ -50,6 +66,13 @@ class CommentImportAll(Base):
 
 class CommentGetAll(Base):
     comments: list[CommentGet] = []
+    limit: int
+    offset: int
+    total: int
+
+
+class CommentGetAllWithStatus(Base):
+    comments: list[CommentGetWithStatus] = []
     limit: int
     offset: int
     total: int
