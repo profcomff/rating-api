@@ -79,3 +79,11 @@ class ForbiddenSymbol(RatingAPIError):
             f"The comment contains forbidden symbols. Letters of English and Russian languages, numbers and punctuation marks are allowed",
             f"Комментарий содержит запрещенный символ. Разрешены буквы английского и русского языков, цифры и знаки препинания",
         )
+
+
+class UpdateError(RatingAPIError):
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg} Conflict with update a resource that already exists or has conflicting information.",
+            f"{msg} Конфликт с обновлением ресурса, который уже существует или имеет противоречивую информацию.",
+        )

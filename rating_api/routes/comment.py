@@ -15,10 +15,11 @@ from rating_api.exceptions import (
     ObjectNotFound,
     TooManyCommentRequests,
     TooManyCommentsToLecturer,
+    UpdateError,
 )
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost, CommentUpdate
 from rating_api.settings import Settings, get_settings
 
 
@@ -224,7 +225,7 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
@@ -244,6 +245,42 @@ async def review_comment(
         raise ObjectNotFound(Comment, uuid)
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
+
+
+@comment.patch("/{uuid}", response_model=CommentGet)
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+    """Позволяет изменить свой неанонимный комментарий"""
+    comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
+
+    if comment.user_id != user.get("id") or comment.user_id is None:
+        raise ForbiddenAction(Comment)
+
+    # Получаем только переданные для обновления поля
+    update_data = comment_update.model_dump(exclude_unset=True)
+
+    # Если не передано ни одного параметра
+    if not update_data:
+        raise UpdateError(msg="Provide any parametr.")
+        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
+
+    # Проверяем, есть ли неизмененные поля
+    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
+    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
+
+    if unchanged_fields:
+        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
+
+    # Обновление комментария
+    updated_comment = Comment.update(
+        session=db.session,
+        id=uuid,
+        **update_data,
+        update_ts=datetime.datetime.utcnow(),
+        review_status=ReviewStatus.PENDING,
+    )
+
+    return CommentGet.model_validate(updated_comment)
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)

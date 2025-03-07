@@ -9,6 +9,7 @@ from rating_api.exceptions import (
     ObjectNotFound,
     TooManyCommentRequests,
     TooManyCommentsToLecturer,
+    UpdateError,
     WrongMark,
 )
 from rating_api.schemas.base import StatusResponseModel
@@ -69,4 +70,11 @@ async def comment_too_long_handler(req: starlette.requests.Request, exc: Comment
 async def forbidden_symbol_handler(req: starlette.requests.Request, exc: ForbiddenSymbol):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=400
+    )
+
+
+@app.exception_handler(UpdateError)
+async def update_error_handler(req: starlette.requests.Request, exc: UpdateError):
+    return JSONResponse(
+        content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=409
     )
