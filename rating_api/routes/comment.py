@@ -1,15 +1,25 @@
 import datetime
+import re
 from typing import Literal
 from uuid import UUID
 
+import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
+from rating_api.exceptions import (
+    CommentTooLong,
+    ForbiddenAction,
+    ForbiddenSymbol,
+    ObjectNotFound,
+    TooManyCommentRequests,
+    TooManyCommentsToLecturer,
+    UpdateError,
+)
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
+from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost, CommentUpdate
 from rating_api.settings import Settings, get_settings
 
 
@@ -41,6 +51,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
                 - datetime.datetime.utcnow()
             )
 
+        if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
+            raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+
+        if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
+            raise ForbiddenSymbol()
+
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
     create_ts = datetime.datetime(now.year, now.month, 1)
@@ -61,6 +77,29 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         user_id=user_id,
         review_status=ReviewStatus.PENDING,
     )
+
+    # Выдача аччивки юзеру за первый комментарий
+    async with aiohttp.ClientSession() as session:
+        give_achievement = True
+        async with session.get(
+            settings.API_URL + f"achievement/user/{user.get('id'):}",
+            headers={"Accept": "application/json"},
+        ) as response:
+            if response.status == 200:
+                user_achievements = await response.json()
+                for achievement in user_achievements.get("achievement", []):
+                    if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                        give_achievement = False
+                        break
+            else:
+                give_achievement = False
+        if give_achievement:
+            session.post(
+                settings.API_URL
+                + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
+                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
+            )
+
     return CommentGet.model_validate(new_comment)
 
 
@@ -149,10 +188,11 @@ async def get_comments(
         result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [CommentGet.model_validate(comment) for comment in result.comments]
+    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     return result
 
 
-@comment.patch("/{uuid}", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
@@ -172,6 +212,42 @@ async def review_comment(
         raise ObjectNotFound(Comment, uuid)
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
+
+
+@comment.patch("/{uuid}", response_model=CommentGet)
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+    """Позволяет изменить свой неанонимный комментарий"""
+    comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
+
+    if comment.user_id != user.get("id") or comment.user_id is None:
+        raise ForbiddenAction(Comment)
+
+    # Получаем только переданные для обновления поля
+    update_data = comment_update.model_dump(exclude_unset=True)
+
+    # Если не передано ни одного параметра
+    if not update_data:
+        raise UpdateError(msg="Provide any parametr.")
+        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
+
+    # Проверяем, есть ли неизмененные поля
+    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
+    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
+
+    if unchanged_fields:
+        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
+
+    # Обновление комментария
+    updated_comment = Comment.update(
+        session=db.session,
+        id=uuid,
+        **update_data,
+        update_ts=datetime.datetime.utcnow(),
+        review_status=ReviewStatus.PENDING,
+    )
+
+    return CommentGet.model_validate(updated_comment)
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
