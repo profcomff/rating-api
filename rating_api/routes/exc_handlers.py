@@ -45,7 +45,7 @@ async def too_many_comment_handler(req: starlette.requests.Request, exc: Already
 
 
 @app.exception_handler(ForbiddenAction)
-async def forbidden_action_handler(req: starlette.requests.Request, exc: AlreadyExists):
+async def forbidden_action_handler(req: starlette.requests.Request, exc: ForbiddenAction):
     return JSONResponse(
         content=StatusResponseModel(status="Error", message=exc.eng, ru=exc.ru).model_dump(), status_code=403
     )
