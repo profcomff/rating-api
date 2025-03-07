@@ -38,6 +38,7 @@ class CommentPost(Base):
             raise WrongMark()
         return value
 
+
 class CommentUpdate(Base):
     subject: str = None
     text: str = None
