@@ -1,6 +1,6 @@
 import datetime
-from typing import Literal, Union
 import re
+from typing import Literal, Union
 from uuid import UUID
 
 import aiohttp
