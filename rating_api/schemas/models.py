@@ -55,9 +55,37 @@ class CommentPost(Base):
         return value
 
 
-class CommentImport(CommentPost):
+class CommentUpdate(Base):
+    subject: str = None
+    text: str = None
+    mark_kindness: int = None
+    mark_freebie: int = None
+    mark_clarity: int = None
+
+    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @classmethod
+    def validate_mark(cls, value):
+        if value not in [-2, -1, 0, 1, 2]:
+            raise WrongMark()
+        return value
+
+
+class CommentImport(Base):
     lecturer_id: int
     subject: str | None = None
+    text: str
+    create_ts: datetime.datetime | None = None
+    update_ts: datetime.datetime | None = None
+    mark_kindness: int
+    mark_freebie: int
+    mark_clarity: int
+
+    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @classmethod
+    def validate_mark(cls, value):
+        if value not in [-2, -1, 0, 1, 2]:
+            raise WrongMark()
+        return value
 
 
 class CommentImportAll(Base):

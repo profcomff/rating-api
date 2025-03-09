@@ -25,7 +25,6 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
-                "is_anonymous": False,
             },
             0,
             status.HTTP_200_OK,
@@ -48,7 +47,6 @@ settings = get_settings()
                 "mark_kindness": -2,
                 "mark_freebie": -2,
                 "mark_clarity": -2,
-                "is_anonymous": False,
             },
             1,
             status.HTTP_200_OK,
@@ -60,7 +58,6 @@ settings = get_settings()
                 "mark_kindness": 5,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False,
             },
             2,
             status.HTTP_400_BAD_REQUEST,
@@ -72,7 +69,6 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": False,
             },
             3,
             status.HTTP_404_NOT_FOUND,
@@ -101,19 +97,18 @@ settings = get_settings()
             0,
             status.HTTP_200_OK,
         ),
-        (  # Bad anonymity
+        (  # Not provided anonymity
             {
                 "subject": "test_subject",
                 "text": "test text",
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": 'asd',
             },
             0,
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_200_OK,
         ),
-        (  # Not provided anonymity
+        (  # Bad anonymity
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -260,11 +255,89 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
 def test_review_comment(client, dbsession, unreviewed_comment, comment, review_status, response_status, is_reviewed):
     commment_to_reivew = comment if is_reviewed else unreviewed_comment
     query = {"review_status": review_status}
-    response = client.patch(f"{url}/{commment_to_reivew.uuid}", params=query)
+    response = client.patch(f"{url}/{commment_to_reivew.uuid}/review", params=query)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
         dbsession.refresh(commment_to_reivew)
         assert commment_to_reivew.review_status == ReviewStatus(review_status)
+
+
+@pytest.mark.parametrize(
+    'body, response_status',
+    [
+        (
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 0,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "subject": 0,
+                "text": "test_text",
+                "mark_kindness": 0,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+        (  # Отсутсвует одно поле
+            {
+                "subject": "test_subject",
+                "mark_kindness": 0,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "subject": "test_subject",
+                "text": "test_text",
+                "mark_kindness": 5,
+                "mark_freebie": -2,
+                "mark_clarity": 0,
+            },
+            status.HTTP_400_BAD_REQUEST,
+        ),
+        (  # Отсутсвует все поля
+            {},
+            status.HTTP_409_CONFLICT,
+        ),
+        (  # Переданы НЕизмененные поля
+            {
+                "subject": "subject",
+                "text": "comment",
+                "mark_kindness": 1,
+                "mark_clarity": 1,
+                "mark_freebie": 1,
+            },
+            status.HTTP_409_CONFLICT,
+        ),
+        (  # НЕизмененным перелано одно поле
+            {
+                "subject": "asf",
+                "text": "asf",
+                "mark_kindness": 2,
+                "mark_clarity": 2,
+                "mark_freebie": 1,
+            },
+            status.HTTP_409_CONFLICT,
+        ),
+    ],
+)
+def test_update_comment(client, dbsession, nonanonymous_comment, body, response_status):
+    response = client.patch(f"{url}/{nonanonymous_comment.uuid}", json=body)
+    assert response.status_code == response_status
+    if response.status_code == status.HTTP_200_OK:
+        dbsession.refresh(nonanonymous_comment)
+        assert nonanonymous_comment.review_status == ReviewStatus.PENDING
+        for k, v in body.items():
+            assert getattr(nonanonymous_comment, k, None) == v  # Есть ли изменения в БД
 
 
 def test_delete_comment(client, dbsession, comment):
