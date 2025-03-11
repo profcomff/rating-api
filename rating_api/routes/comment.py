@@ -26,6 +26,7 @@ from rating_api.schemas.models import (
     CommentGetWithStatus,
     CommentImportAll,
     CommentPost,
+    CommentUpdate,
 )
 from rating_api.settings import Settings, get_settings
 
