@@ -149,10 +149,10 @@ async def get_comments(
     user_id: int | None = None,
     order_by: list[Literal["create_ts"]] = Query(default=[]),
     unreviewed: bool = False,
-    user=Depends(UnionAuth(scopes=["rating.comment.user"], auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
 ) -> CommentGetAll:
     """
-    Scopes: `["rating.comment.user"]`
+    Scopes: `["rating.comment.review"]`
 
     `limit` - максимальное количество возвращаемых комментариев
 
@@ -171,7 +171,7 @@ async def get_comments(
     comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    if "rating.comment.user" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
+    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
         result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithStatus
     else:
@@ -187,10 +187,7 @@ async def get_comments(
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
-        if (
-            "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]
-            or user.get('id') == user_id
-        ):
+        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
             result.comments = [
                 comment
                 for comment in result.comments
