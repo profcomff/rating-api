@@ -79,7 +79,6 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     user_id = None if comment_info.is_anonymous else user.get('id')
 
     new_comment = Comment.create(
-        session=db.session,
         **comment_info.model_dump(exclude={"is_anonymous"}),
         lecturer_id=lecturer_id,
         user_id=user_id,
@@ -93,7 +92,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             settings.API_URL + f"achievement/user/{user.get('id'):}",
             headers={"Accept": "application/json"},
         ) as response:
-            if response.status == 200:
+            if response.status == 300:
                 user_achievements = await response.json()
                 for achievement in user_achievements.get("achievement", []):
                     if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
