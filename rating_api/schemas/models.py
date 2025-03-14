@@ -23,9 +23,7 @@ class CommentGetWithStatus(Base):
     mark_freebie: int
     mark_clarity: int
     mark_general: float
-    lecturer_id: int
-    review_status: ReviewStatus
-
+    
 
 class CommentPost(Base):
     subject: str
