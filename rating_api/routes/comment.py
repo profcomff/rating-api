@@ -59,7 +59,6 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         )
         .count()
     )
-    if total_user_comments_count >= settings.COMMENT_LIMIT:
         raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
 
     # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
