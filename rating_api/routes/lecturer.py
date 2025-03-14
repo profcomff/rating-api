@@ -18,7 +18,7 @@ lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
 @lecturer.post("", response_model=LecturerGet)
 async def create_lecturer(
     lecturer_info: LecturerPost,
-    _=Depends(UnionAuth(scopes=["rating.lecturer.create"], allow_none=False, auto_error=True)),
+    _=Depends(UnionAuth(allow_none=False, auto_error=True)),
 ) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.create"]`
@@ -28,6 +28,8 @@ async def create_lecturer(
     get_lecturer: Lecturer = (
         Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
     )
+    for i in range(10):
+        print(i)
     if get_lecturer is None:
         new_lecturer: Lecturer = Lecturer.create(session=db.session, **lecturer_info.model_dump())
         db.session.commit()
