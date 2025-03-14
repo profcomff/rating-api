@@ -27,11 +27,6 @@ jobs:
           fetch-depth: 0  # Получаем полную историю для сравнения изменений
           # Удален ref: ${{ github.event.pull_request.head.sha }} так как он не нужен для pull_request
 
-      - name: Check Workflow File
-        run: |
-          ls -la .github/workflows/
-          cat .github/workflows/mistral_review.yml
-
       - name: Install Python
         uses: actions/setup-python@v4
         with:
