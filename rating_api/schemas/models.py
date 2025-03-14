@@ -14,8 +14,6 @@ class CommentGet(Base):
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str | None = None
-    text: str
-    mark_kindness: int
 
 
 class CommentGetWithStatus(Base):
