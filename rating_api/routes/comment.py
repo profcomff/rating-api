@@ -96,7 +96,6 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         lecturer_id=lecturer_id,
         user_id=user.get('id'),
         create_ts=create_ts,
-        update_ts=create_ts,
     )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
@@ -116,7 +115,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             settings.API_URL + f"achievement/user/{user.get('id'):}",
             headers={"Accept": "application/json"},
         ) as response:
-            if response.status == 200:
+            if response.status == 400:
                 user_achievements = await response.json()
                 for achievement in user_achievements.get("achievement", []):
                     if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
@@ -199,7 +198,7 @@ async def get_comments(
         result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithStatus
     else:
-        result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
+        result = CommentGet(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGet
     result.comments = comments
     if user_id is not None:
