@@ -142,6 +142,25 @@ def create_review_with_comments(file_comments, commit_id):
     # Словарь для хранения первых позиций в каждом файле (для файловых комментариев)
     file_first_positions = {}
     
+    # Сначала найдем первую позицию для каждого файла
+    for file_path, file_info in pr_files.items():
+        patch = file_info.get('patch', '')
+        
+        # Попробуем получить первую позицию из patch
+        if patch:
+            lines = patch.split('\n')
+            if len(lines) > 0:
+                file_first_positions[file_path] = 1  # Первая строка patch всегда подходит
+                
+                # Ищем первое изменение (строка с +)
+                for i, line in enumerate(lines):
+                    if line.startswith('+'):
+                        file_first_positions[file_path] = i + 1  # +1 потому что позиции в GitHub начинаются с 1
+                        break
+        else:
+            # Если нет patch, используем позицию 1
+            file_first_positions[file_path] = 1
+    
     for file_path, comments in file_comments.items():
         total_comments += len(comments)
         
@@ -169,15 +188,14 @@ def create_review_with_comments(file_comments, commit_id):
         line_position_map = {}
         line_num = 0
         position = 0
-        first_position = None
+        
+        # Если это первый файл, убедимся, что он имеет позицию
+        if file_path not in file_first_positions:
+            file_first_positions[file_path] = 1
         
         # Парсим diff для определения позиций
         for line in full_diff.split('\n'):
             position += 1
-            
-            # Сохраняем первую позицию после заголовка diff
-            if position == 1 and not first_position:
-                first_position = position
             
             if line.startswith('@@'):
                 # Парсим информацию о строках: @@ -start,count +start,count @@
@@ -185,27 +203,12 @@ def create_review_with_comments(file_comments, commit_id):
                 matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
                 if matches:
                     line_num = int(matches.group(2)) - 1  # -1 чтобы начать с правильного номера для следующей строки
-                
-                # После заголовка секции diff тоже хорошее место для комментария
-                if not first_position:
-                    first_position = position
             
             if line.startswith('+'):
                 line_num += 1
                 line_position_map[line_num] = position
-                
-                # Первая добавленная строка тоже подходит для комментария
-                if not first_position:
-                    first_position = position
             elif line.startswith(' '):
                 line_num += 1
-        
-        # Сохраняем первую доступную позицию для файла
-        if first_position:
-            file_first_positions[file_path] = first_position
-        else:
-            # Если не удалось найти подходящую позицию, используем 1
-            file_first_positions[file_path] = 1
         
         # Также создаем альтернативную карту из patch в API
         api_line_position_map = {}
@@ -228,7 +231,7 @@ def create_review_with_comments(file_comments, commit_id):
                     line_num += 1
         
         # Группируем комментарии по файлам, если не удается найти позицию
-        file_level_comments = {}
+        file_level_comments = []
         
         # Добавляем новый метод для определения позиции: поиск контекста
         for comment in comments:
@@ -274,21 +277,18 @@ def create_review_with_comments(file_comments, commit_id):
                 placed_comments += 1
             else:
                 # Если не удалось найти позицию, добавляем комментарий к группе файловых комментариев
-                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавляем к файловым комментариям")
-                if file_path not in file_level_comments:
-                    file_level_comments[file_path] = []
-                file_level_comments[file_path].append(f"**Комментарий к строке {start_line}**: {comment_body}")
+                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
+                file_level_comments.append(f"**Комментарий к строке {start_line}**: {comment_body}")
         
         # Добавляем сгруппированные комментарии к файлу на первую доступную позицию
-        for file_path, comments_list in file_level_comments.items():
-            if file_path in file_first_positions:
-                first_position = file_first_positions[file_path]
-                review_comments.append({
-                    "path": file_path,
-                    "position": first_position,
-                    "body": "\n\n".join(comments_list)
-                })
-                placed_comments += 1
+        if file_level_comments:
+            first_position = file_first_positions.get(file_path, 1)  # Если нет позиции, используем 1
+            review_comments.append({
+                "path": file_path,
+                "position": first_position,
+                "body": "\n\n".join(file_level_comments)
+            })
+            placed_comments += 1
     
     # Статистика
     print(f"Всего комментариев: {total_comments}")
@@ -298,6 +298,13 @@ def create_review_with_comments(file_comments, commit_id):
         print("Нет комментариев для добавления")
         return False
     
+    # Проверка, что все комментарии имеют позицию
+    for i, comment in enumerate(review_comments):
+        if "position" not in comment or comment["position"] is None:
+            # Если позиция отсутствует, установим её в 1
+            print(f"Исправляем отсутствующую позицию для комментария {i} к файлу {comment['path']}")
+            comment["position"] = 1
+    
     # Создаем ревью
     review_data = {
         "commit_id": commit_id,
@@ -306,10 +313,42 @@ def create_review_with_comments(file_comments, commit_id):
     }
     
     print(f"Отправляем запрос на создание ревью с {len(review_comments)} комментариями")
+    for i, comment in enumerate(review_comments):
+        print(f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}")
     
     response = requests.post(review_url, headers=headers, json=review_data)
     if response.status_code not in [200, 201]:
         print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
+        
+        # Пробуем создать ревью без линейных комментариев
+        if "comments" in review_data:
+            print("Пробуем создать общий комментарий к PR...")
+            summary = "# Комментарии к коду\n\n"
+            
+            for comment in review_comments:
+                file_path = comment.get("path", "неизвестный файл")
+                body = comment.get("body", "")
+                summary += f"## Файл: {file_path}\n\n{body}\n\n---\n\n"
+            
+            review_data = {
+                "commit_id": commit_id,
+                "event": "COMMENT",
+                "body": summary
+            }
+            
+            response = requests.post(
+                f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+                headers=headers,
+                json=review_data
+            )
+            
+            if response.status_code not in [200, 201]:
+                print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+                return False
+            else:
+                print("Общий комментарий к PR успешно создан.")
+                return True
+        
         return False
     
     print(f"Ревью успешно создано с {len(review_comments)} комментариями")
