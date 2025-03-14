@@ -1,7 +1,7 @@
 name: Автоматическое ревью PR с Mistral AI
 
 on:
-  pull_request_target:
+  pull_request:  # Вернули обратно с pull_request_target на pull_request
     types: [opened, synchronize]
     branches:
       - main  # или ваша основная ветка
@@ -11,11 +11,26 @@ jobs:
     runs-on: ubuntu-latest
     name: Mistral AI Code Review
     steps:
+      - name: Debug Trigger Event
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}"
+          echo "PR number: ${{ github.event.pull_request.number }}"
+          echo "Base branch: ${{ github.event.pull_request.base.ref }}"
+          echo "Head branch: ${{ github.event.pull_request.head.ref }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
           fetch-depth: 0  # Получаем полную историю для сравнения изменений
-          ref: ${{ github.event.pull_request.head.sha }}  # Важно для pull_request_target
+          # Удален ref: ${{ github.event.pull_request.head.sha }} так как он не нужен для pull_request
+
+      - name: Check Workflow File
+        run: |
+          ls -la .github/workflows/
+          cat .github/workflows/mistral_review.yml
 
       - name: Install Python
         uses: actions/setup-python@v4
@@ -26,6 +41,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install requests mistralai==0.4.2
+
+      - name: Check for MISTRAL_API_KEY
+        run: |
+          if [ -z "${{ secrets.MISTRAL_API_KEY }}" ]; then
+            echo "⚠️ MISTRAL_API_KEY is not set or empty"
+            exit 1
+          else
+            echo "✅ MISTRAL_API_KEY is set"
+          fi
 
       - name: Create Python Script
         run: |
@@ -56,13 +80,13 @@ result = subprocess.run(
     capture_output=True,
     text=True
 )
-files = [f for f in result.stdout.strip().split("\n") if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
+files = [f for f in result.stdout.strip().split("\\n") if f.endswith((\'.py\', \'.js\', \'.ts\', \'.go\', \'.java\', \'.cs\', \'.cpp\', \'.h\', \'.c\'))]
 
 if not files:
     print("Нет файлов для ревью")
     sys.exit(0)
 
-full_review = "## Ревью кода с помощью Mistral AI\n\n"
+full_review = "## Ревью кода с помощью Mistral AI\\n\\n"
 
 for file_path in files:
     if not os.path.exists(file_path):
@@ -124,10 +148,10 @@ for file_path in files:
         review_text = chat_response.choices[0].message.content
         
         # Добавляем ревью в общий отчет
-        full_review += f"### Ревью для файла: `{file_path}`\n\n{review_text}\n\n---\n\n"
+        full_review += f"### Ревью для файла: `{file_path}`\\n\\n{review_text}\\n\\n---\\n\\n"
     except Exception as e:
         print(f"Ошибка при анализе {file_path}: {e}")
-        full_review += f"### Ошибка при анализе файла `{file_path}`\n\n---\n\n"
+        full_review += f"### Ошибка при анализе файла `{file_path}`\\n\\n---\\n\\n"
 
 # Сохраняем полный обзор в файл
 with open("review.txt", "w", encoding="utf-8") as f:
