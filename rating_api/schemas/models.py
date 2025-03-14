@@ -13,8 +13,6 @@ class CommentGet(Base):
     user_id: int | None = None
     create_ts: datetime.datetime
     update_ts: datetime.datetime
-    subject: str | None = None
-
 
 class CommentGetWithStatus(Base):
     uuid: UUID
