@@ -101,6 +101,15 @@ def get_commit_id():
     
     return head_sha
 
+def extract_file_content(file_path):
+    """Извлекает содержимое файла из репозитория"""
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.readlines()
+    except Exception as e:
+        print(f"Ошибка при чтении файла {file_path}: {e}")
+        return []
+
 def create_review_with_comments(file_comments, commit_id):
     """Создает ревью с комментариями к конкретным строкам кода"""
     review_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews"
@@ -108,6 +117,13 @@ def create_review_with_comments(file_comments, commit_id):
         "Authorization": f"token {github_token}",
         "Accept": "application/vnd.github.v3+json"
     }
+    
+    # Получаем информацию о PR
+    pr_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    pr_response = requests.get(pr_url, headers=headers)
+    pr_info = {}
+    if pr_response.status_code == 200:
+        pr_info = pr_response.json()
     
     # Сначала получаем файлы, измененные в PR для определения правильных position
     files_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/files"
@@ -118,45 +134,141 @@ def create_review_with_comments(file_comments, commit_id):
         for file_info in files_response.json():
             pr_files[file_info['filename']] = file_info
     
-    # Подготавливаем комментарии в нужном формате
+    # Подготавливаем комментарии
     review_comments = []
+    total_comments = 0
+    placed_comments = 0
+    
     for file_path, comments in file_comments.items():
+        total_comments += len(comments)
+        
+        print(f"Обрабатываем комментарии для файла: {file_path}")
         if file_path not in pr_files:
             print(f"Файл {file_path} не найден в PR")
             continue
             
-        # Получаем patch для определения position
+        # Получаем patch и diff для определения position
         patch = pr_files[file_path].get('patch', '')
         
-        # Создаем map номеров строк в файле -> позиция в diff
+        # Используем git diff для получения более точной информации
+        diff_result = subprocess.run(
+            f"git diff {base_sha} {head_sha} -- {file_path}",
+            shell=True,
+            capture_output=True,
+            text=True
+        )
+        full_diff = diff_result.stdout
+        
+        # Получаем содержимое файла для дополнительной проверки
+        file_content = extract_file_content(file_path)
+        
+        # Создаем карту номеров строк и позиций
         line_position_map = {}
+        line_num = 0
         position = 0
-        new_line_num = 0
+        
+        # Парсим diff для определения позиций
+        for line in full_diff.split('\n'):
+            if line.startswith('@@'):
+                # Парсим информацию о строках: @@ -start,count +start,count @@
+                hunk_info = line.split('@@')[1].strip()
+                matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
+                if matches:
+                    line_num = int(matches.group(2)) - 1  # -1 чтобы начать с правильного номера для следующей строки
+            
+            position += 1
+            
+            if line.startswith('+'):
+                line_num += 1
+                line_position_map[line_num] = position
+            elif line.startswith(' '):
+                line_num += 1
+        
+        # Также создаем альтернативную карту из patch в API
+        api_line_position_map = {}
+        line_num = 0
+        position = 0
         
         if patch:
             for line in patch.split('\n'):
+                if line.startswith('@@'):
+                    matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', line.split('@@')[1].strip())
+                    if matches:
+                        line_num = int(matches.group(2)) - 1
+                
                 position += 1
+                
                 if line.startswith('+'):
-                    new_line_num += 1
-                    line_position_map[new_line_num] = position
-                elif line.startswith(' '):  # Контекстная строка
-                    new_line_num += 1
+                    line_num += 1
+                    api_line_position_map[line_num] = position
+                elif line.startswith(' '):
+                    line_num += 1
         
+        # Добавляем новый метод для определения позиции: поиск контекста
         for comment in comments:
             start_line = comment['start_line']
             comment_body = comment['comment']
+            position_found = False
             
-            # Пытаемся найти позицию в diff
+            # 1. Попробуем найти прямое соответствие в нашей карте из diff
             if start_line in line_position_map:
                 position = line_position_map[start_line]
+                position_found = True
+                print(f"Найдена позиция для строки {start_line} в карте из diff: {position}")
+            
+            # 2. Попробуем найти в карте из API
+            elif start_line in api_line_position_map:
+                position = api_line_position_map[start_line]
+                position_found = True
+                print(f"Найдена позиция для строки {start_line} в карте из API: {position}")
+            
+            # 3. Если все еще не найдено, попробуем использовать относительную позицию
+            elif file_content and 0 < start_line <= len(file_content):
+                # Найдем контекст строки в файле
+                target_line = file_content[start_line - 1].rstrip()
+                context_line = target_line.strip()
                 
+                if context_line:
+                    # Ищем эту строку в diff
+                    lines = full_diff.split('\n')
+                    for i, line in enumerate(lines):
+                        if line.startswith('+') and context_line in line.strip():
+                            # Вычисляем position относительно начала diff
+                            position = i + 1  # +1 потому что позиции в GitHub начинаются с 1
+                            position_found = True
+                            print(f"Найдена позиция для строки {start_line} через контекст: {position}")
+                            break
+            
+            if position_found:
                 review_comments.append({
                     "path": file_path,
                     "position": position,
                     "body": comment_body
                 })
+                placed_comments += 1
             else:
-                print(f"Не удалось определить position для строки {start_line} в файле {file_path}")
+                # Если не удалось найти позицию, добавим комментарий к файлу
+                file_level_comment = f"Комментарий к строке {start_line}: {comment_body}"
+                
+                # Ищем уже существующий комментарий к файлу
+                file_comment = next((c for c in review_comments if c.get("path") == file_path and not c.get("position")), None)
+                
+                if file_comment:
+                    # Добавляем к существующему комментарию
+                    file_comment["body"] += f"\n\n{file_level_comment}"
+                else:
+                    # Создаем новый комментарий к файлу
+                    review_comments.append({
+                        "path": file_path,
+                        "body": file_level_comment
+                    })
+                    placed_comments += 1
+                
+                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
+    
+    # Статистика
+    print(f"Всего комментариев: {total_comments}")
+    print(f"Размещено комментариев: {placed_comments}")
     
     if not review_comments:
         print("Нет комментариев для добавления")
@@ -169,11 +281,14 @@ def create_review_with_comments(file_comments, commit_id):
         "comments": review_comments
     }
     
+    print(f"Отправляем запрос на создание ревью с {len(review_comments)} комментариями")
+    
     response = requests.post(review_url, headers=headers, json=review_data)
     if response.status_code not in [200, 201]:
         print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
         return False
     
+    print(f"Ревью успешно создано с {len(review_comments)} комментариями")
     return True
 
 # Собираем все комментарии по файлам
@@ -230,6 +345,7 @@ for file_path in files:
 7. Если изменение хорошее - тоже отметь это.
 8. Добавь в конце общую оценку изменений от 1 до 5, где 5 - отлично.
 9. Убедись, что номера строк соответствуют итоговому файлу (строки с '+'), а не diff.
+10. Не используй в СТРОКАХ диапазоны, указывай конкретные номера строк для каждого комментария.
 """
     
     # Запрос к Mistral AI
