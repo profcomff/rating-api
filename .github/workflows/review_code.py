@@ -139,6 +139,9 @@ def create_review_with_comments(file_comments, commit_id):
     total_comments = 0
     placed_comments = 0
     
+    # Словарь для хранения первых позиций в каждом файле (для файловых комментариев)
+    file_first_positions = {}
+    
     for file_path, comments in file_comments.items():
         total_comments += len(comments)
         
@@ -166,23 +169,43 @@ def create_review_with_comments(file_comments, commit_id):
         line_position_map = {}
         line_num = 0
         position = 0
+        first_position = None
         
         # Парсим diff для определения позиций
         for line in full_diff.split('\n'):
+            position += 1
+            
+            # Сохраняем первую позицию после заголовка diff
+            if position == 1 and not first_position:
+                first_position = position
+            
             if line.startswith('@@'):
                 # Парсим информацию о строках: @@ -start,count +start,count @@
                 hunk_info = line.split('@@')[1].strip()
                 matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
                 if matches:
                     line_num = int(matches.group(2)) - 1  # -1 чтобы начать с правильного номера для следующей строки
-            
-            position += 1
+                
+                # После заголовка секции diff тоже хорошее место для комментария
+                if not first_position:
+                    first_position = position
             
             if line.startswith('+'):
                 line_num += 1
                 line_position_map[line_num] = position
+                
+                # Первая добавленная строка тоже подходит для комментария
+                if not first_position:
+                    first_position = position
             elif line.startswith(' '):
                 line_num += 1
+        
+        # Сохраняем первую доступную позицию для файла
+        if first_position:
+            file_first_positions[file_path] = first_position
+        else:
+            # Если не удалось найти подходящую позицию, используем 1
+            file_first_positions[file_path] = 1
         
         # Также создаем альтернативную карту из patch в API
         api_line_position_map = {}
@@ -203,6 +226,9 @@ def create_review_with_comments(file_comments, commit_id):
                     api_line_position_map[line_num] = position
                 elif line.startswith(' '):
                     line_num += 1
+        
+        # Группируем комментарии по файлам, если не удается найти позицию
+        file_level_comments = {}
         
         # Добавляем новый метод для определения позиции: поиск контекста
         for comment in comments:
@@ -247,24 +273,22 @@ def create_review_with_comments(file_comments, commit_id):
                 })
                 placed_comments += 1
             else:
-                # Если не удалось найти позицию, добавим комментарий к файлу
-                file_level_comment = f"Комментарий к строке {start_line}: {comment_body}"
-                
-                # Ищем уже существующий комментарий к файлу
-                file_comment = next((c for c in review_comments if c.get("path") == file_path and not c.get("position")), None)
-                
-                if file_comment:
-                    # Добавляем к существующему комментарию
-                    file_comment["body"] += f"\n\n{file_level_comment}"
-                else:
-                    # Создаем новый комментарий к файлу
-                    review_comments.append({
-                        "path": file_path,
-                        "body": file_level_comment
-                    })
-                    placed_comments += 1
-                
-                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
+                # Если не удалось найти позицию, добавляем комментарий к группе файловых комментариев
+                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавляем к файловым комментариям")
+                if file_path not in file_level_comments:
+                    file_level_comments[file_path] = []
+                file_level_comments[file_path].append(f"**Комментарий к строке {start_line}**: {comment_body}")
+        
+        # Добавляем сгруппированные комментарии к файлу на первую доступную позицию
+        for file_path, comments_list in file_level_comments.items():
+            if file_path in file_first_positions:
+                first_position = file_first_positions[file_path]
+                review_comments.append({
+                    "path": file_path,
+                    "position": first_position,
+                    "body": "\n\n".join(comments_list)
+                })
+                placed_comments += 1
     
     # Статистика
     print(f"Всего комментариев: {total_comments}")
