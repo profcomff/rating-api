@@ -1,0 +1,160 @@
+name: Автоматическое ревью PR с Mistral AI
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+      - main  # или ваша основная ветка
+
+jobs:
+  code_review:
+    runs-on: ubuntu-latest
+    name: Mistral AI Code Review
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Получаем полную историю для сравнения изменений
+
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests mistralai
+
+      - name: Mistral AI Code Review
+        run: |
+          cat << EOF > review_code.py
+          import os
+          import sys
+          import json
+          import requests
+          import subprocess
+          from mistralai.client import MistralClient
+          from mistralai.models.chat_completion import ChatMessage
+          
+          # Инициализация Mistral AI клиента
+          client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
+          
+          # Получаем информацию о PR
+          pr_number = os.environ.get("PR_NUMBER")
+          repository = os.environ.get("GITHUB_REPOSITORY")
+          
+          # Получаем список измененных файлов
+          base_sha = os.environ.get("BASE_SHA")
+          head_sha = os.environ.get("HEAD_SHA")
+          result = subprocess.run(
+              f"git diff --name-only {base_sha} {head_sha}",
+              shell=True,
+              capture_output=True,
+              text=True
+          )
+          files = [f for f in result.stdout.strip().split('\n') if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
+          
+          if not files:
+              print("Нет файлов для ревью")
+              sys.exit(0)
+          
+          full_review = "## Ревью кода с помощью Mistral AI\n\n"
+          
+          for file_path in files:
+              if not os.path.exists(file_path):
+                  continue
+                  
+              with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                  try:
+                      code_content = f.read()
+                  except Exception as e:
+                      print(f"Ошибка при чтении {file_path}: {e}")
+                      continue
+              
+              # Пропускаем пустые файлы
+              if not code_content.strip():
+                  continue
+              
+              # Получаем diff для файла
+              diff_result = subprocess.run(
+                  f"git diff {base_sha} {head_sha} -- {file_path}",
+                  shell=True,
+                  capture_output=True,
+                  text=True
+              )
+              diff = diff_result.stdout
+              
+              # Формируем промпт для Mistral AI
+              prompt = f"""Проанализируй изменения в файле и предоставь краткое ревью кода.
+              
+              Имя файла: {file_path}
+              
+              Изменения (diff):
+              ```
+              {diff}
+              ```
+              
+              Полный код файла:
+              ```
+              {code_content[:10000] if len(code_content) > 10000 else code_content}
+              ```
+              
+              Пожалуйста, проанализируй код и найди:
+              1. Потенциальные баги или проблемы
+              2. Улучшения производительности
+              3. Проблемы безопасности
+              4. Улучшения читаемости и структуры кода
+              
+              Дай конкретные рекомендации. Если изменения хорошие, также отметь это.
+              """
+              
+              # Запрос к Mistral AI
+              try:
+                  messages = [
+                      ChatMessage(role="user", content=prompt)
+                  ]
+                  
+                  chat_response = client.chat(
+                      model="mistral-small",  # Можно использовать mistral-medium или mistral-small для более быстрого анализа
+                      messages=messages
+                  )
+                  
+                  review_text = chat_response.choices[0].message.content
+                  
+                  # Добавляем ревью в общий отчет
+                  full_review += f"### Ревью для файла: `{file_path}`\n\n{review_text}\n\n---\n\n"
+              except Exception as e:
+                  print(f"Ошибка при анализе {file_path}: {e}")
+                  full_review += f"### Ошибка при анализе файла `{file_path}`\n\n---\n\n"
+          
+          # Сохраняем полный обзор в файл
+          with open("review.txt", "w", encoding='utf-8') as f:
+              f.write(full_review)
+          
+          EOF
+          
+          # Запускаем скрипт ревью кода
+          python review_code.py
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Comment PR
+        run: |
+          # Устанавливаем GitHub CLI
+          type -p curl >/dev/null || apt-get install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+          && apt-get update \
+          && apt-get install gh -y
+          
+          # Публикуем комментарий к PR
+          gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+          gh pr comment ${{ github.event.pull_request.number }} --body-file review.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
