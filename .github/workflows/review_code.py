@@ -110,6 +110,77 @@ def extract_file_content(file_path):
         print(f"Ошибка при чтении файла {file_path}: {e}")
         return []
 
+def get_diff_hunk_for_position(patch, position):
+    """Извлекает кусок diff (hunk) для конкретной позиции"""
+    lines = patch.split('\n')
+    if 0 <= position < len(lines):
+        # Ищем начало текущего diff hunk
+        start_idx = position
+        while start_idx > 0 and not lines[start_idx].startswith('@@'):
+            start_idx -= 1
+            
+        if start_idx < 0 or not lines[start_idx].startswith('@@'):
+            return None
+        
+        # Ищем конец текущего diff hunk (либо следующий хедер '@@', либо конец diff)
+        end_idx = position
+        while end_idx < len(lines) and not (end_idx > position and lines[end_idx].startswith('@@')):
+            end_idx += 1
+            
+        # Извлекаем diff hunk
+        hunk_lines = lines[start_idx:end_idx]
+        return '\n'.join(hunk_lines)
+    
+    return None
+
+def validate_position(patch, position):
+    """Проверяет, что позиция указывает на действительную строку в diff"""
+    if position <= 0:
+        return False
+        
+    lines = patch.split('\n')
+    if position >= len(lines):
+        return False
+        
+    # Проверяем, что позиция находится внутри блока изменений
+    diff_hunk = get_diff_hunk_for_position(patch, position)
+    if not diff_hunk:
+        return False
+        
+    # Проверяем, что строка на указанной позиции не начинается с '-' (удаленная строка)
+    if position < len(lines) and lines[position].startswith('-'):
+        return False
+        
+    return True
+
+def find_position_by_content(patch, content, line_num, vicinity=2):
+    """Ищет позицию в patch по содержимому строки и её окружению"""
+    lines = patch.split('\n')
+    content = content.strip()
+    
+    # Если содержимое пустое, не ищем
+    if not content:
+        return None
+        
+    for i, line in enumerate(lines):
+        # Ищем точное совпадение
+        if (line.startswith('+') or line.startswith(' ')) and content in line.strip():
+            # Проверяем, что мы нашли diff hunk для этой позиции
+            if get_diff_hunk_for_position(patch, i):
+                return i
+    
+    # Если точное совпадение не найдено, пробуем искать по частям
+    for i, line in enumerate(lines):
+        if line.startswith('+') or line.startswith(' '):
+            # Разбиваем контент на части и ищем совпадения
+            content_parts = content.split()
+            if content_parts and any(part in line for part in content_parts if len(part) > 3):
+                # Проверяем, что мы нашли diff hunk для этой позиции
+                if get_diff_hunk_for_position(patch, i):
+                    return i
+    
+    return None
+
 def create_review_with_comments(file_comments, commit_id):
     """Создает ревью с комментариями к конкретным строкам кода"""
     review_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews"
@@ -141,6 +212,7 @@ def create_review_with_comments(file_comments, commit_id):
     
     # Словарь для хранения первых позиций в каждом файле (для файловых комментариев)
     file_first_positions = {}
+    file_diff_hunks = {}
     
     # Сначала найдем первую позицию для каждого файла
     for file_path, file_info in pr_files.items():
@@ -157,9 +229,13 @@ def create_review_with_comments(file_comments, commit_id):
                     if line.startswith('+'):
                         file_first_positions[file_path] = i + 1  # +1 потому что позиции в GitHub начинаются с 1
                         break
+                
+                # Сохраняем diff hunk для первой позиции
+                file_diff_hunks[file_path] = get_diff_hunk_for_position(patch, file_first_positions[file_path])
         else:
             # Если нет patch, используем позицию 1
             file_first_positions[file_path] = 1
+            file_diff_hunks[file_path] = None
     
     for file_path, comments in file_comments.items():
         total_comments += len(comments)
@@ -188,6 +264,9 @@ def create_review_with_comments(file_comments, commit_id):
                 })
                 placed_comments += 1
             continue
+        
+        # Сохраняем патч для дальнейшего использования
+        pr_files[file_path]['parsed_patch'] = patch
         
         # Используем git diff для получения более точной информации
         diff_result = subprocess.run(
@@ -253,15 +332,31 @@ def create_review_with_comments(file_comments, commit_id):
             for i, line in enumerate(file_content):
                 line_content_map[i+1] = line.strip()
         
+        # 4. Создаем карту соответствия позиций и diff hunk
+        position_hunk_map = {}
+        for pos in range(len(patch.split('\n'))):
+            hunk = get_diff_hunk_for_position(patch, pos)
+            if hunk:
+                position_hunk_map[pos] = hunk
+        
         # Группируем комментарии по файлам, если не удается найти позицию
         file_level_comments = []
         file_comments_added = 0
         
         # Для валидации позиций перед отправкой
         valid_positions = set()
-        for line in patch.split('\n'):
+        position_hunk_mapping = {}
+        
+        # Находим все валидные позиции в patch
+        lines = patch.split('\n')
+        for pos, line in enumerate(lines):
             if not line.startswith('-'):  # Все строки кроме удаленных
-                valid_positions.add(position)
+                if validate_position(patch, pos):
+                    valid_positions.add(pos)
+                    # Сохраняем diff hunk для этой позиции
+                    hunk = get_diff_hunk_for_position(patch, pos)
+                    if hunk:
+                        position_hunk_mapping[pos] = hunk
         
         # Добавляем новый алгоритм для определения позиции
         for comment in comments:
@@ -269,102 +364,102 @@ def create_review_with_comments(file_comments, commit_id):
             comment_body = comment['comment']
             position_found = False
             position = None
+            diff_hunk = None
             
-            # Проходим по всем картам в порядке точности
+            # Метод 1: Проходим по всем картам в порядке точности
             for map_name, position_map in line_position_maps.items():
                 if start_line in position_map:
                     position = position_map[start_line]
-                    position_found = True
-                    print(f"Найдена позиция для строки {start_line} в карте {map_name}: {position}")
-                    break
+                    # Проверяем валидность позиции
+                    if position in valid_positions:
+                        diff_hunk = position_hunk_mapping.get(position)
+                        if diff_hunk:
+                            position_found = True
+                            print(f"Найдена позиция для строки {start_line} в карте {map_name}: {position} с валидным diff_hunk")
+                            break
+                    else:
+                        print(f"Найдена позиция {position} для строки {start_line} в карте {map_name}, но она невалидна")
             
-            # Если не найдено прямое соответствие, пробуем поиск по контексту
+            # Метод 2: Если не найдено прямое соответствие, пробуем поиск по контексту
             if not position_found and file_content and 0 < start_line <= len(file_content):
-                # 1. Поиск по точному совпадению содержимого строки
+                # 2.1 Поиск по точному совпадению содержимого строки
                 target_line = file_content[start_line - 1].rstrip()
                 context_line = target_line.strip()
                 
                 if context_line:
                     # Ищем в diff
-                    lines = full_diff.split('\n')
-                    for i, line in enumerate(lines):
-                        if line.startswith('+') and context_line in line.strip():
-                            position = i + 1
+                    position = find_position_by_content(patch, context_line, start_line)
+                    if position is not None and position in valid_positions:
+                        diff_hunk = position_hunk_mapping.get(position)
+                        if diff_hunk:
                             position_found = True
-                            print(f"Найдена позиция для строки {start_line} через точное совпадение контекста: {position}")
-                            break
+                            print(f"Найдена позиция для строки {start_line} через точное совпадение контекста: {position} с валидным diff_hunk")
                 
-                # 2. Поиск по окружающему контексту (±2 строки)
+                # 2.2 Поиск по окружающему контексту (±5 строк)
                 if not position_found:
                     context_lines = []
-                    for offset in range(-2, 3):
+                    for offset in range(-5, 6):
                         idx = start_line - 1 + offset
                         if 0 <= idx < len(file_content):
                             context_lines.append(file_content[idx].strip())
                     
-                    # Ищем последовательность строк в diff
-                    if context_lines:
-                        lines = full_diff.split('\n')
-                        for i in range(len(lines) - len(context_lines) + 1):
-                            match_count = 0
-                            for j, context in enumerate(context_lines):
-                                if context and i+j < len(lines) and context in lines[i+j].strip():
-                                    match_count += 1
-                            
-                            # Если нашли достаточно совпадений
-                            if match_count >= 2:  # Минимум 2 совпадения из 5 строк
-                                # Позиция соответствует середине контекста
-                                position = i + 2  # +2 для учета середины контекста
-                                position_found = True
-                                print(f"Найдена позиция для строки {start_line} через окружающий контекст: {position}")
-                                break
+                    # Ищем любую из строк в контексте
+                    for i, context in enumerate(context_lines):
+                        if context and offset != 0:  # Не ищем саму строку еще раз
+                            position = find_position_by_content(patch, context, start_line - 5 + i)
+                            if position is not None and position in valid_positions:
+                                diff_hunk = position_hunk_mapping.get(position)
+                                if diff_hunk:
+                                    position_found = True
+                                    print(f"Найдена позиция для строки {start_line} через окружающий контекст (строка {start_line - 5 + i}): {position} с валидным diff_hunk")
+                                    break
                 
-                # 3. Поиск ближайшей измененной строки (для комментариев к строкам рядом с измененными)
-                if not position_found:
+                # 2.3 Поиск ближайшей валидной позиции
+                if not position_found and valid_positions:
+                    # Ищем ближайшую строку, которая имеет валидную позицию
                     nearest_line = None
+                    nearest_position = None
                     min_distance = float('inf')
                     
-                    for line_num in line_position_map_git.keys():
-                        distance = abs(line_num - start_line)
-                        if distance < min_distance:
-                            min_distance = distance
-                            nearest_line = line_num
+                    for line_num, pos in line_position_map_api.items():
+                        if pos in valid_positions:
+                            distance = abs(line_num - start_line)
+                            if distance < min_distance:
+                                min_distance = distance
+                                nearest_line = line_num
+                                nearest_position = pos
                     
-                    if nearest_line and min_distance <= 3:  # Максимум 3 строки отличия
-                        position = line_position_map_git[nearest_line]
-                        position_found = True
-                        print(f"Найдена позиция для строки {start_line} через ближайшую измененную строку {nearest_line}: {position}")
+                    if nearest_position and min_distance <= 5:  # Максимум 5 строк отличия
+                        position = nearest_position
+                        diff_hunk = position_hunk_mapping.get(position)
+                        if diff_hunk:
+                            position_found = True
+                            print(f"Найдена ближайшая валидная позиция для строки {start_line} (строка {nearest_line}): {position} с diff_hunk")
             
-            # Проверяем, что позиция валидна
-            if position_found:
-                # Если позиция указывает на удаленную строку, корректируем
-                if position > 0 and not position in valid_positions:
-                    patch_lines = patch.split('\n')
-                    # Ищем ближайшую неудаленную строку
-                    for i in range(1, 5):  # Проверяем в радиусе 5 строк
-                        if position + i in valid_positions:
-                            position = position + i
-                            break
-                        elif position - i in valid_positions:
-                            position = position - i
-                            break
-                    
-                    print(f"Скорректирована позиция для строки {start_line}: {position}")
-                
-                # Проверяем на выход за пределы диапазона
-                if position < 1:
-                    position = 1  # Минимальная позиция
-                
+            # Метод 3: Если все методы не сработали, используем первую валидную позицию в файле
+            if not position_found:
+                for pos in sorted(valid_positions):
+                    diff_hunk = position_hunk_mapping.get(pos)
+                    if diff_hunk:
+                        position = pos
+                        position_found = True
+                        print(f"Используем первую валидную позицию {position} для строки {start_line} с diff_hunk")
+                        break
+            
+            # Финальная проверка и добавление комментария
+            if position_found and position is not None and diff_hunk:
                 review_comments.append({
                     "path": file_path,
                     "position": position,
-                    "body": comment_body
+                    "body": comment_body,
+                    "diff_hunk": diff_hunk  # Добавляем diff_hunk для каждого комментария
                 })
                 placed_comments += 1
                 file_comments_added += 1
+                print(f"✅ Успешно определена позиция {position} с diff_hunk для строки {start_line}")
             else:
                 # Если не удалось найти позицию, добавляем комментарий к группе файловых комментариев
-                print(f"Не удалось определить позицию для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
+                print(f"❌ Не удалось определить валидную позицию для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
                 file_level_comments.append(f"**Комментарий к строке {start_line}**: {comment_body}")
         
         # Добавляем сгруппированные комментарии к файлу на первую доступную позицию
@@ -372,11 +467,19 @@ def create_review_with_comments(file_comments, commit_id):
             # Для файлов без успешных комментариев
             if file_comments_added == 0:
                 first_position = file_first_positions.get(file_path, 1)
-                review_comments.append({
+                first_hunk = file_diff_hunks.get(file_path)
+                
+                comment_data = {
                     "path": file_path,
                     "position": first_position,
                     "body": "# Комментарии к файлу\n\n" + "\n\n".join(file_level_comments)
-                })
+                }
+                
+                # Если есть diff_hunk для первой позиции, добавляем его
+                if first_hunk:
+                    comment_data["diff_hunk"] = first_hunk
+                
+                review_comments.append(comment_data)
                 placed_comments += 1
             else:
                 # Если есть успешные комментарии, добавляем файловые комментарии к первому из них
@@ -405,6 +508,19 @@ def create_review_with_comments(file_comments, commit_id):
         if comment["path"] not in pr_files:
             print(f"Пропускаем невалидный комментарий к файлу {comment['path']}: файл не найден в PR")
             continue
+            
+        # Проверка наличия diff_hunk
+        if "diff_hunk" not in comment and comment["path"] in pr_files and pr_files[comment["path"]].get('patch'):
+            hunk = get_diff_hunk_for_position(pr_files[comment["path"]]['parsed_patch'], comment["position"])
+            if hunk:
+                comment["diff_hunk"] = hunk
+            else:
+                print(f"Пропускаем комментарий к файлу {comment['path']}: не удалось найти diff_hunk")
+                continue
+                
+        # Удаляем diff_hunk если он не требуется GitHub API
+        if "diff_hunk" in comment:
+            del comment["diff_hunk"]
             
         # Добавляем валидный комментарий
         valid_review_comments.append(comment)
@@ -451,9 +567,10 @@ def create_review_with_comments(file_comments, commit_id):
         print(f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}")
     
     # Увеличиваем вероятность успеха, отправляя комментарии по одному, если их много
-    if len(valid_review_comments) > 5:
+    if len(valid_review_comments) > 3:
         print("Много комментариев, отправляем по одному для увеличения вероятности успеха")
         successful_comments = 0
+        failed_comments = []
         
         for i, comment in enumerate(valid_review_comments):
             single_review_data = {
@@ -467,10 +584,39 @@ def create_review_with_comments(file_comments, commit_id):
                 successful_comments += 1
                 print(f"Успешно создан комментарий {i+1}/{len(valid_review_comments)}")
             else:
+                failed_comments.append(comment)
                 print(f"Ошибка при создании комментария {i+1}: {single_response.status_code} - {single_response.text}")
         
         if successful_comments > 0:
             print(f"Успешно создано {successful_comments} из {len(valid_review_comments)} комментариев")
+            
+            # Если есть неудачные комментарии, создаем для них общий комментарий
+            if failed_comments:
+                print(f"Создаем общий комментарий для {len(failed_comments)} неудачных комментариев")
+                summary = "# Дополнительные комментарии\n\n"
+                
+                for comment in failed_comments:
+                    file_path = comment.get("path", "неизвестный файл")
+                    body = comment.get("body", "")
+                    summary += f"## Файл: {file_path}\n\n{body}\n\n---\n\n"
+                
+                review_data = {
+                    "commit_id": commit_id,
+                    "event": "COMMENT",
+                    "body": summary
+                }
+                
+                response = requests.post(
+                    f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+                    headers=headers,
+                    json=review_data
+                )
+                
+                if response.status_code not in [200, 201]:
+                    print(f"Ошибка при создании общего комментария для неудачных комментариев: {response.status_code} - {response.text}")
+                else:
+                    print("Общий комментарий для неудачных комментариев успешно создан.")
+            
             return True
         else:
             # Если не удалось создать ни один комментарий, создаем общий комментарий
