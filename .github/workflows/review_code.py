@@ -521,22 +521,6 @@ for file_path in files:
         
         review_text = chat_response.choices[0].message.content
         
-        # Улучшенный парсинг комментариев к строкам
-        line_comments = parse_line_comments(review_text)
-        
-        # Проверяем комментарии на соответствие реальным изменениям
-        verified_comments = []
-        for comment in line_comments:
-            start_line = comment['start_line']
-            
-            # Проверяем, что строка действительно была изменена или добавлена
-            if start_line in diff_map:
-                verified_comments.append(comment)
-            else:
-                print(f"Пропускаем комментарий к строке {start_line}, так как она не была изменена")
-        
-        if verified_comments:
-            all_file_comments[file_path] = verified_comments
         
         # Добавляем ревью в общий отчет с информацией о файле
         full_review += f"### Ревью для файла: `{file_path}`\n\n{review_text}\n\n---\n\n"
