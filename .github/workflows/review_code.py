@@ -726,7 +726,7 @@ else:
     
     try:
         chat_response = client.chat(
-            model="open-codestral-mamba",
+            model="mistral-large-latest",
             messages=[
                 {"role": "user", "content": prompt}
             ]
