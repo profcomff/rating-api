@@ -21,7 +21,7 @@ class ObjectNotFound(RatingAPIError):
 
 
 class ObjectFound(RatingAPIError):
-    def __init__(self, obj: type, obj_id_or_name: int | str):
+    def __init__(self, obj: type, obj_id_or_name: int):
         super().__init__(
             f"Object {obj.__name__} {obj_id_or_name=} not found",
             f"Объект {obj.__name__}  с идентификатором {obj_id_or_name} не найден",
