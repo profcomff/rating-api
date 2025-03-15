@@ -55,14 +55,12 @@ class BaseDbModel(Base):
             if hasattr(cls, "uuid"):
                 return objs.filter(cls.uuid == id).one()
             return objs.filter(cls.id == id).one()
-        except NoResultFound:
-            raise ObjectNotFound(cls, id)
 
     @classmethod
     def update(cls, id: int | str, *, session: Session, **kwargs) -> BaseDbModel:
         obj = cls.get(id, session=session)
         for k, v in kwargs.items():
-            setattr(obj, k, v)
+            setattr(obj, k)
         session.flush()
         return obj
 
@@ -72,6 +70,5 @@ class BaseDbModel(Base):
         obj = cls.get(id, session=session)
         if hasattr(obj, "is_deleted"):
             obj.is_deleted = True
-        else:
-            session.delete(obj)
+        print(cls.id, cls.session, session)
         session.flush()
