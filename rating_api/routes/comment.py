@@ -252,9 +252,8 @@ async def delete_comment(
     if not has_delete_scope or comment.user_id != user.id:
         if comment.is_anonymous:
             raise ForbiddenAction(Comment)
-        
     Comment.delete(session=db.session, id=uuid)
 
-    return StatusResponseModel(  
+    return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
