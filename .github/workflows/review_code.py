@@ -17,39 +17,13 @@ github_token = os.environ.get("GITHUB_TOKEN")
 # Получаем список измененных файлов
 base_sha = os.environ.get("BASE_SHA")
 head_sha = os.environ.get("HEAD_SHA")
-
-print(f"Сравниваю коммиты: {base_sha} и {head_sha}")
-
-# Если не указаны SHA, пытаемся использовать HEAD и HEAD~1
-if not base_sha or not head_sha:
-    print("Не указаны SHA коммитов, пытаемся использовать HEAD и HEAD~1")
-    base_sha = "HEAD~1"
-    head_sha = "HEAD"
-    os.environ["BASE_SHA"] = base_sha
-    os.environ["HEAD_SHA"] = head_sha
-
 result = subprocess.run(
     f"git diff --name-only {base_sha} {head_sha}",
     shell=True,
     capture_output=True,
     text=True
 )
-
-if result.returncode != 0:
-    print(f"Ошибка при выполнении git diff: {result.stderr}")
-    # Для локального тестирования используем текущие файлы в каталоге
-    print("Используем альтернативный метод поиска файлов для тестирования")
-    find_cmd = subprocess.run(
-        "find . -type f -name '*.py' | grep -v '__pycache__' | grep -v '.github' | head -5",
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-    files = [f.strip() for f in find_cmd.stdout.strip().split("\n") if f.strip()]
-else:
-    files = [f for f in result.stdout.strip().split("\n") if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
-
-print(f"Найдено {len(files)} файлов для анализа: {files}")
+files = [f for f in result.stdout.strip().split("\n") if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
 
 if not files:
     print("Нет файлов для ревью")
@@ -384,70 +358,10 @@ def create_review_with_comments(file_comments, commit_id):
 all_file_comments = {}
 full_review = "## Ревью кода с помощью Mistral AI\n\n"
 
-# Получаем общую информацию о проекте для контекста
-project_context = ""
-try:
-    # Поиск всех файлов проекта для контекста
-    find_files_cmd = subprocess.run(
-        "find . -type f -name '*.py' | grep -v '__pycache__' | sort",
-        shell=True,
-        capture_output=True,
-        text=True
-    )
-    project_files = find_files_cmd.stdout.strip().split("\n")
-    
-    # Создаем краткое описание структуры проекта
-    project_context = "Структура проекта:\n\n"
-    
-    # Группируем файлы по директориям для лучшего понимания структуры
-    dirs = {}
-    for file_path in project_files:
-        if not file_path:
-            continue
-        parts = file_path.split('/')
-        if len(parts) > 1:
-            dir_path = '/'.join(parts[:-1])
-            if dir_path not in dirs:
-                dirs[dir_path] = []
-            dirs[dir_path].append(parts[-1])
-    
-    # Формируем структуру для промпта
-    for dir_path, files in dirs.items():
-        project_context += f"{dir_path}/\n"
-        for file in files[:5]:  # Ограничиваем количество файлов для каждой директории
-            project_context += f"  - {file}\n"
-        if len(files) > 5:
-            project_context += f"  - ... и еще {len(files) - 5} файлов\n"
-    
-    # Добавляем важные файлы целиком для контекста (например, модели, интерфейсы и т.д.)
-    for important_file in [f for f in project_files if f.endswith(('models.py', 'schemas.py', 'interfaces.py', 'types.py'))]:
-        if os.path.exists(important_file) and os.path.getsize(important_file) < 10000:  # Не более 10KB
-            try:
-                with open(important_file, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    project_context += f"\nВажный файл: {important_file}\n```python\n{content}\n```\n"
-            except Exception:
-                pass
-    
-except Exception as e:
-    print(f"Ошибка при создании контекста проекта: {e}")
-
-# Обрабатываем каждый измененный файл
 for file_path in files:
     if not os.path.exists(file_path):
         continue
-    
-    print(f"Анализ файла: {file_path}")
-    
-    # Получаем полное содержимое файла для контекста
-    file_content = ""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            file_content = f.read()
-    except Exception as e:
-        print(f"Ошибка при чтении файла {file_path}: {e}")
-        continue
-    
+        
     # Получаем diff для файла
     diff_result = subprocess.run(
         f"git diff {base_sha} {head_sha} -- {file_path}",
@@ -460,98 +374,47 @@ for file_path in files:
     if not diff.strip():
         continue
     
-    # Создаем карту изменений для более точного определения номеров строк
-    diff_map = {}
-    current_line = 0
-    for line in diff.split('\n'):
-        if line.startswith('@@'):
-            # Парсим информацию о строках: @@ -start,count +start,count @@
-            matches = re.match(r'@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@', line)
-            if matches:
-                current_line = int(matches.group(1)) - 1
-        elif line.startswith('+'):
-            current_line += 1
-            # Сохраняем добавленные строки и их позиции
-            clean_line = line[1:].strip()  # Убираем '+' и лишние пробелы
-            diff_map[current_line] = clean_line
-        elif line.startswith(' '):  # Неизмененные строки
-            current_line += 1
-    
-    # Выводим информацию о найденных изменениях для отладки
-    if diff_map:
-        print(f"Найдено {len(diff_map)} изменённых строк в файле {file_path}:")
-        for line_num in sorted(diff_map.keys())[:5]:  # Показываем первые 5 строк
-            print(f"  Строка {line_num}: {diff_map[line_num][:50]}...")
-        if len(diff_map) > 5:
-            print(f"  ... и ещё {len(diff_map) - 5} строк")
-    else:
-        print(f"⚠️ Не найдено изменённых строк в файле {file_path}, хотя diff не пустой")
-        print("Возможно, проблема с парсингом diff. Первые 5 строк diff:")
-        for line in diff.split("\n")[:5]:
-            print(f"  {line}")
-    
-    # Парсим diff чтобы выделить изменения для промпта
+    # Парсим diff чтобы выделить изменения
     changes = parse_diff(diff)
     
     if not changes:
         continue
     
-    # Формируем улучшенный промпт для Mistral AI
-    prompt = f"""# Задача: Профессиональное ревью кода для pull request
+    # Формируем промпт для Mistral AI с фокусом только на изменениях
+    prompt = f"""Ты выполняешь ревью кода для pull request. Напиши комментарии ТОЛЬКО по измененным строкам кода, НЕ весь файл.
 
-## Файл
-{file_path}
+Имя файла: {file_path}
 
-## Информация о проекте
-{project_context[:4000]}  # Ограничиваем размер контекста проекта
-
-## Полное содержимое файла
-```python
-{file_content[:7000]}  # Ограничиваем размер файла
+Изменения (diff):
 ```
-
-## Изменения в формате diff
-```diff
 {diff}
 ```
 
-## Инструкции для ревью:
-
-1. Анализируй весь код файла для понимания контекста и общей логики.
-2. Оставляй комментарии ТОЛЬКО к строкам, которые были изменены (отмечены + в diff).
-3. Сфокусируйся на важных проблемах:
-   - Потенциальные баги и логические ошибки
+Инструкции:
+1. Пиши комментарии на РУССКОМ языке.
+2. Анализируй ТОЛЬКО строки, начинающиеся с '+' (добавленные) и измененный контекст.
+3. Комментируй каждое значимое изменение отдельно с привязкой к номеру строки.
+4. Не комментируй удаленные строки (начинающиеся с '-').
+5. Проверь на:
+   - Ошибки и потенциальные баги
+   - Возможности оптимизации и улучшения производительности
    - Проблемы безопасности
-   - Проблемы производительности
-   - Нарушения стандартов кодирования
-   - Повторяющийся или избыточный код
-   - Возможные улучшения структуры и читаемости кода
-
-4. Форматирование ответа СТРОГО в следующем виде:
+   - Соответствие стандартам кодирования и улучшения читаемости
+6. Структурируй ответ в формате:
    ```
-   СТРОКА X: Конкретный комментарий к проблеме на строке X
+   СТРОКА 123: Твой комментарий о проблеме или предложение улучшения
+   СТРОКА 125-128: Комментарий к блоку кода
    ```
-   
-   Пример:
-   ```
-   СТРОКА 42: Здесь возможна ошибка деления на ноль, так как переменная может быть равна 0.
-   ```
-
-5. Номер строки должен соответствовать текущему файлу.
-6. Номер строки указывай только как число, без диапазонов и дополнительных символов.
-7. Предлагай конкретные решения проблем.
-8. В конце оцени общее качество кода и изменений по шкале от 1 до 5, где 5 - отлично.
-9. Пиши на РУССКОМ языке.
+7. Если изменение хорошее - тоже отметь это.
+8. Добавь в конце общую оценку изменений от 1 до 5, где 5 - отлично.
+9. Убедись, что номера строк соответствуют итоговому файлу (строки с '+'), а не diff.
+10. Не используй в СТРОКАХ диапазоны, указывай конкретные номера строк для каждого комментария.
 """
     
-    # Запрос к Mistral AI с использованием улучшенной модели
+    # Запрос к Mistral AI
     try:
-        # Определяем модель для использования
-        model = os.environ.get("MISTRAL_MODEL", "codestral-mamba")  # По умолчанию используем codestral-mamba, но можно переопределить
-        print(f"Используем модель Mistral AI: {model}")
-        
         chat_response = client.chat(
-            model=model,  # Используем модель Mamba для улучшенной работы с кодом
+            model="codestral-mamba",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -559,36 +422,10 @@ for file_path in files:
         
         review_text = chat_response.choices[0].message.content
         
-        print("\nРезультат анализа от Mistral AI:")
-        print("=" * 50)
-        print(review_text[:500] + ("..." if len(review_text) > 500 else ""))
-        print("=" * 50)
-        
-        # Улучшенный парсинг комментариев к строкам
+        # Парсим комментарии к строкам
         line_comments = parse_line_comments(review_text)
-        
-        print(f"Извлечено {len(line_comments)} комментариев к строкам:")
-        for i, comment in enumerate(line_comments[:3], 1):
-            print(f"  {i}. Строка {comment['start_line']}: {comment['comment'][:50]}...")
-        if len(line_comments) > 3:
-            print(f"  ... и ещё {len(line_comments) - 3} комментариев")
-        
-        # Проверяем комментарии на соответствие реальным изменениям
-        verified_comments = []
-        for comment in line_comments:
-            start_line = comment['start_line']
-            
-            # Проверяем, что строка действительно была изменена или добавлена
-            if start_line in diff_map:
-                verified_comments.append(comment)
-                print(f"✅ Комментарий к строке {start_line} принят (строка изменена)")
-            else:
-                print(f"❌ Пропускаем комментарий к строке {start_line}, так как она не была изменена")
-        
-        print(f"Итого после проверки: {len(verified_comments)} комментариев к изменённым строкам")
-        
-        if verified_comments:
-            all_file_comments[file_path] = verified_comments
+        if line_comments:
+            all_file_comments[file_path] = line_comments
         
         # Добавляем ревью в общий отчет с информацией о файле
         full_review += f"### Ревью для файла: `{file_path}`\n\n{review_text}\n\n---\n\n"
@@ -599,20 +436,10 @@ for file_path in files:
 # Сохраняем полный обзор в файл
 with open("review.txt", "w", encoding="utf-8") as f:
     f.write(full_review)
-print(f"Полный обзор сохранен в файл review.txt")
 
 # Создаем ревью с комментариями к конкретным строкам кода
 if all_file_comments:
-    total_file_comments = sum(len(comments) for comments in all_file_comments.values())
-    print(f"Всего файлов с комментариями: {len(all_file_comments)}")
-    print(f"Всего комментариев для размещения: {total_file_comments}")
-    
     commit_id = get_commit_id()
     create_review_with_comments(all_file_comments, commit_id)
 else:
-    print("Не найдено комментариев к строкам кода")
-    print("Возможные причины:")
-    print("1. Модель не предоставила комментарии в требуемом формате 'СТРОКА X:'")
-    print("2. Комментарии были только к строкам, которые не являются изменёнными")
-    print("3. Проблемы с обнаружением изменений в файлах")
-    print("4. Ограничения API GitHub при попытке создать ревью") 
+    print("Не найдено комментариев к строкам кода") 
