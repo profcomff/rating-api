@@ -508,8 +508,12 @@ for file_path in files:
     
     # Запрос к Mistral AI с использованием улучшенной модели
     try:
+        # Определяем модель для использования
+        model = os.environ.get("MISTRAL_MODEL", "codestral-mamba")  # По умолчанию используем codestral-mamba, но можно переопределить
+        print(f"Используем модель Mistral AI: {model}")
+        
         chat_response = client.chat(
-            model="codestral",  # Используем специализированную модель для кода
+            model=model,  # Используем модель Mamba для улучшенной работы с кодом
             messages=[
                 {"role": "user", "content": prompt}
             ]
