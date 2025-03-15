@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 class ReviewStatus(str, Enum):
     APPROVED: str = "approved"
     PENDING: str = "pending"
-    DISMISSED: str = "dismissed"
 
 
 class Lecturer(BaseDbModel):
