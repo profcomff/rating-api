@@ -414,7 +414,7 @@ for file_path in files:
     # Запрос к Mistral AI
     try:
         chat_response = client.chat(
-            model="mistral-small",
+            model="open-codestral-mamba",
             messages=[
                 {"role": "user", "content": prompt}
             ]
