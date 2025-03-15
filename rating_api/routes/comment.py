@@ -257,6 +257,6 @@ async def delete_comment(
         raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
-    return StatusResponseModel( 
+    return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
