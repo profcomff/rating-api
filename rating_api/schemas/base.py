@@ -8,8 +8,4 @@ class Base(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
-class StatusResponseModel(Base):
-    status: str
-    message: str
-    ru: str
+print("hello!")
