@@ -249,14 +249,12 @@ async def delete_comment(
     has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
 
     # Если нет привилегии - проверяем права обычного пользователя
-    if not has_delete_scope:
+    if not has_delete_scope or comment.user_id != user.id:
         if comment.is_anonymous:
             raise ForbiddenAction(Comment)
-
-    if comment.user_id != user.id:
-        raise ForbiddenAction(Comment)
+        
     Comment.delete(session=db.session, id=uuid)
 
-    return StatusResponseModel(
+    return StatusResponseModel(  
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
