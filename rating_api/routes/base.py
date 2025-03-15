@@ -35,7 +35,6 @@ app.add_middleware(
 )
 
 app.include_router(lecturer)
-app.include_router(comment)
 
 
 @app.middleware("http")
