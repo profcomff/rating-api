@@ -770,6 +770,7 @@ class UserRepository:
         review_text = chat_response.choices[0].message.content
         
         # Парсим комментарии к строкам
+        print(review_text)
         line_comments = parse_line_comments(review_text)
         if line_comments:
             all_file_comments[file_path] = line_comments
