@@ -766,11 +766,10 @@ class UserRepository:
                 {"role": "user", "content": prompt}
             ]
         )
-        
+        print(chat_response)
         review_text = chat_response.choices[0].message.content
         
         # Парсим комментарии к строкам
-        print(review_text)
         line_comments = parse_line_comments(review_text)
         if line_comments:
             all_file_comments[file_path] = line_comments
@@ -781,9 +780,6 @@ class UserRepository:
         print(f"Ошибка при анализе {file_path}: {e}")
         full_review += f"### Ошибка при анализе файла `{file_path}`\n\n---\n\n"
 
-# Сохраняем полный обзор в файл
-with open("review.txt", "w", encoding="utf-8") as f:
-    f.write(full_review)
 
 # Создаем ревью с комментариями к конкретным строкам кода
 if all_file_comments:
