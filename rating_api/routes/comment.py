@@ -41,27 +41,50 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
     """
-    lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+    # Проверяем, что лектор с заданным id существует
+    Lecturer.get(session=db.session, id=lecturer_id)
+
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-    if not lecturer:
-        raise ObjectNotFound(Lecturer, lecturer_id)
-    user_comments: list[LecturerUserComment] = (
-        LecturerUserComment.query(session=db.session).filter(LecturerUserComment.user_id == user.get("id")).all()
+    # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
+    cutoff_date_total = datetime.datetime(
+        now.year + (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12,
+        (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12,
+        1,
     )
-    for user_comment in user_comments:
-        if datetime.datetime.utcnow() - user_comment.update_ts < datetime.timedelta(
-            minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES
-        ):
-            raise TooManyCommentRequests(
-                dtime=user_comment.update_ts
-                + datetime.timedelta(minutes=settings.COMMENT_CREATE_FREQUENCY_IN_MINUTES)
-                - datetime.datetime.utcnow()
-            )
+    total_user_comments_count = (
+        LecturerUserComment.query(session=db.session)
+        .filter(
+            LecturerUserComment.user_id == user.get("id"),
+            LecturerUserComment.update_ts >= cutoff_date_total,
+        )
+        .count()
+    )
+    if total_user_comments_count >= settings.COMMENT_LIMIT:
+        raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
 
-        if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
-            raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+    # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
+    cutoff_date_lecturer = datetime.datetime(
+        now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
+        (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
+        1,
+    )
+    lecturer_user_comments_count = (
+        LecturerUserComment.query(session=db.session)
+        .filter(
+            LecturerUserComment.user_id == user.get("id"),
+            LecturerUserComment.lecturer_id == lecturer_id,
+            LecturerUserComment.update_ts >= cutoff_date_lecturer,
+        )
+        .count()
+    )
+    if lecturer_user_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
+        raise TooManyCommentsToLecturer(
+            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
+        )
 
+    if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
+        raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+        
         # if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
         #     raise ForbiddenSymbol()
 
