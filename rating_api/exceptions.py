@@ -8,6 +8,7 @@ class RatingAPIError(Exception):
     def __init__(self, eng: str, ru: str) -> None:
         self.eng = eng
         self.ru = ru
+        self.spanish = ru + eng
         super().__init__(eng)
 
 
