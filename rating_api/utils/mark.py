@@ -12,7 +12,7 @@ def calc_weighted_mark(
     lecturer_mark_general: float | ColumnExpressionArgument[float],
     lecturer_comments_num: int | ColumnExpressionArgument[int],
     mean_mark_general: float,
-) -> float | UnaryExpression[Any]:
+) -> float:
     total_weight = lecturer_comments_num + settings.MEAN_MARK_GENERAL_WEIGHT
     mark_weighted = (
         lecturer_mark_general * lecturer_comments_num + mean_mark_general * settings.MEAN_MARK_GENERAL_WEIGHT
