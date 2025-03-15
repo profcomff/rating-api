@@ -249,8 +249,8 @@ async def delete_comment(
     has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
 
     # Если нет привилегии - проверяем права обычного пользователя
-    if not has_delete_scope or comment.user_id != user.id:
-        if comment.is_anonymous:
+    if not has_delete_scope:
+        if comment.is_anonymous or comment.user_id != user.id:
             raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
