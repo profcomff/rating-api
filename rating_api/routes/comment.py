@@ -292,18 +292,29 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
-    uuid: UUID, _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
+    uuid: UUID,
+    user=Depends(UnionAuth(auto_error=True, allow_none=False)),
 ):
     """
     Scopes: `["rating.comment.delete"]`
 
     Удаляет комментарий по его UUID в базе данных RatingAPI
     """
-    check_comment = Comment.get(session=db.session, id=uuid)
-    if check_comment is None:
+    comment = db.session.query(Comment).filter_by(uuid=uuid).one_or_none()
+    if comment is None:
         raise ObjectNotFound(Comment, uuid)
+    # Наличие скоупа для удаления любых комментариев
+    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
+
+    # Если нет привилегии - проверяем права обычного пользователя
+    if not has_delete_scope:
+        if comment.is_anonymous:
+            raise ForbiddenAction(Comment)
+
+    if not has_delete_scope or comment.user_id != user.id:
+        raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
-    return StatusResponseModel(
+    return StatusResponseModel( 
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
