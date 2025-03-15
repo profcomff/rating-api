@@ -17,13 +17,39 @@ github_token = os.environ.get("GITHUB_TOKEN")
 # Получаем список измененных файлов
 base_sha = os.environ.get("BASE_SHA")
 head_sha = os.environ.get("HEAD_SHA")
+
+print(f"Сравниваю коммиты: {base_sha} и {head_sha}")
+
+# Если не указаны SHA, пытаемся использовать HEAD и HEAD~1
+if not base_sha or not head_sha:
+    print("Не указаны SHA коммитов, пытаемся использовать HEAD и HEAD~1")
+    base_sha = "HEAD~1"
+    head_sha = "HEAD"
+    os.environ["BASE_SHA"] = base_sha
+    os.environ["HEAD_SHA"] = head_sha
+
 result = subprocess.run(
     f"git diff --name-only {base_sha} {head_sha}",
     shell=True,
     capture_output=True,
     text=True
 )
-files = [f for f in result.stdout.strip().split("\n") if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
+
+if result.returncode != 0:
+    print(f"Ошибка при выполнении git diff: {result.stderr}")
+    # Для локального тестирования используем текущие файлы в каталоге
+    print("Используем альтернативный метод поиска файлов для тестирования")
+    find_cmd = subprocess.run(
+        "find . -type f -name '*.py' | grep -v '__pycache__' | grep -v '.github' | head -5",
+        shell=True,
+        capture_output=True,
+        text=True
+    )
+    files = [f.strip() for f in find_cmd.stdout.strip().split("\n") if f.strip()]
+else:
+    files = [f for f in result.stdout.strip().split("\n") if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))]
+
+print(f"Найдено {len(files)} файлов для анализа: {files}")
 
 if not files:
     print("Нет файлов для ревью")
@@ -445,12 +471,24 @@ for file_path in files:
                 current_line = int(matches.group(1)) - 1
         elif line.startswith('+'):
             current_line += 1
-            # Сохраняем только добавленные строки и их позиции
+            # Сохраняем добавленные строки и их позиции
             clean_line = line[1:].strip()  # Убираем '+' и лишние пробелы
-            if clean_line:  # Игнорируем пустые строки
-                diff_map[current_line] = clean_line
+            diff_map[current_line] = clean_line
         elif line.startswith(' '):  # Неизмененные строки
             current_line += 1
+    
+    # Выводим информацию о найденных изменениях для отладки
+    if diff_map:
+        print(f"Найдено {len(diff_map)} изменённых строк в файле {file_path}:")
+        for line_num in sorted(diff_map.keys())[:5]:  # Показываем первые 5 строк
+            print(f"  Строка {line_num}: {diff_map[line_num][:50]}...")
+        if len(diff_map) > 5:
+            print(f"  ... и ещё {len(diff_map) - 5} строк")
+    else:
+        print(f"⚠️ Не найдено изменённых строк в файле {file_path}, хотя diff не пустой")
+        print("Возможно, проблема с парсингом diff. Первые 5 строк diff:")
+        for line in diff.split("\n")[:5]:
+            print(f"  {line}")
     
     # Парсим diff чтобы выделить изменения для промпта
     changes = parse_diff(diff)
@@ -521,8 +559,19 @@ for file_path in files:
         
         review_text = chat_response.choices[0].message.content
         
+        print("\nРезультат анализа от Mistral AI:")
+        print("=" * 50)
+        print(review_text[:500] + ("..." if len(review_text) > 500 else ""))
+        print("=" * 50)
+        
         # Улучшенный парсинг комментариев к строкам
         line_comments = parse_line_comments(review_text)
+        
+        print(f"Извлечено {len(line_comments)} комментариев к строкам:")
+        for i, comment in enumerate(line_comments[:3], 1):
+            print(f"  {i}. Строка {comment['start_line']}: {comment['comment'][:50]}...")
+        if len(line_comments) > 3:
+            print(f"  ... и ещё {len(line_comments) - 3} комментариев")
         
         # Проверяем комментарии на соответствие реальным изменениям
         verified_comments = []
@@ -532,8 +581,11 @@ for file_path in files:
             # Проверяем, что строка действительно была изменена или добавлена
             if start_line in diff_map:
                 verified_comments.append(comment)
+                print(f"✅ Комментарий к строке {start_line} принят (строка изменена)")
             else:
-                print(f"Пропускаем комментарий к строке {start_line}, так как она не была изменена")
+                print(f"❌ Пропускаем комментарий к строке {start_line}, так как она не была изменена")
+        
+        print(f"Итого после проверки: {len(verified_comments)} комментариев к изменённым строкам")
         
         if verified_comments:
             all_file_comments[file_path] = verified_comments
@@ -547,10 +599,20 @@ for file_path in files:
 # Сохраняем полный обзор в файл
 with open("review.txt", "w", encoding="utf-8") as f:
     f.write(full_review)
+print(f"Полный обзор сохранен в файл review.txt")
 
 # Создаем ревью с комментариями к конкретным строкам кода
 if all_file_comments:
+    total_file_comments = sum(len(comments) for comments in all_file_comments.values())
+    print(f"Всего файлов с комментариями: {len(all_file_comments)}")
+    print(f"Всего комментариев для размещения: {total_file_comments}")
+    
     commit_id = get_commit_id()
     create_review_with_comments(all_file_comments, commit_id)
 else:
-    print("Не найдено комментариев к строкам кода") 
+    print("Не найдено комментариев к строкам кода")
+    print("Возможные причины:")
+    print("1. Модель не предоставила комментарии в требуемом формате 'СТРОКА X:'")
+    print("2. Комментарии были только к строкам, которые не являются изменёнными")
+    print("3. Проблемы с обнаружением изменений в файлах")
+    print("4. Ограничения API GitHub при попытке создать ревью") 
