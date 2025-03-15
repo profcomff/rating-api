@@ -19,7 +19,6 @@ def client(mocker):
         "id": 0,
         "email": "string",
     }
-    client = TestClient(app)
     return client
 
 
