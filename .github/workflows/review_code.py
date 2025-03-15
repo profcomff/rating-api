@@ -6,15 +6,12 @@ import subprocess
 import re
 from mistralai.client import MistralClient
 
-# Инициализация Mistral AI клиента
 client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
 
-# Получаем информацию о PR
 pr_number = os.environ.get("PR_NUMBER")
 repository = os.environ.get("GITHUB_REPOSITORY")
 github_token = os.environ.get("GITHUB_TOKEN")
 
-# Получаем список измененных файлов
 base_sha = os.environ.get("BASE_SHA")
 head_sha = os.environ.get("HEAD_SHA")
 result = subprocess.run(
@@ -30,20 +27,16 @@ if not files:
     sys.exit(0)
 
 def parse_diff(diff_text):
-    """Парсит diff и возвращает изменения с информацией о строках"""
     changes = []
     current_hunk = None
     lines = diff_text.split('\n')
     file_path = None
     
     for line in lines:
-        # Новый файл или измененный файл
         if line.startswith('diff --git'):
-            file_path = line.split(' ')[2][2:]  # извлекаем путь файла
+            file_path = line.split(' ')[2][2:]
         
-        # Начало нового блока изменений
         elif line.startswith('@@'):
-            # Парсим информацию о строках: @@ -start,count +start,count @@
             hunk_info = line.split('@@')[1].strip()
             matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
             if matches:
@@ -58,17 +51,14 @@ def parse_diff(diff_text):
                 }
                 changes.append(current_hunk)
         
-        # Строки с изменениями
         elif current_hunk is not None:
             current_hunk['lines'].append(line)
     
     return changes
 
 def parse_line_comments(review_text):
-    """Парсит текст ревью и извлекает комментарии к строкам"""
     line_comments = []
     
-    # Регулярное выражение для поиска комментариев в формате "СТРОКА X: комментарий"
     pattern = r'СТРОКА (\d+)(?:-(\d+))?: (.*?)(?=\nСТРОКА|\n\n|$)'
     matches = re.finditer(pattern, review_text, re.DOTALL)
     
@@ -86,7 +76,6 @@ def parse_line_comments(review_text):
     return line_comments
 
 def get_commit_id():
-    """Получает последний коммит в PR"""
     commits_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/commits"
     headers = {
         "Authorization": f"token {github_token}",
@@ -102,7 +91,6 @@ def get_commit_id():
     return head_sha
 
 def extract_file_content(file_path):
-    """Извлекает содержимое файла из репозитория"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.readlines()
@@ -111,10 +99,8 @@ def extract_file_content(file_path):
         return []
 
 def get_diff_hunk_for_position(patch, position):
-    """Извлекает кусок diff (hunk) для конкретной позиции"""
     lines = patch.split('\n')
     if 0 <= position < len(lines):
-        # Ищем начало текущего diff hunk
         start_idx = position
         while start_idx > 0 and not lines[start_idx].startswith('@@'):
             start_idx -= 1
@@ -122,19 +108,16 @@ def get_diff_hunk_for_position(patch, position):
         if start_idx < 0 or not lines[start_idx].startswith('@@'):
             return None
         
-        # Ищем конец текущего diff hunk (либо следующий хедер '@@', либо конец diff)
         end_idx = position
         while end_idx < len(lines) and not (end_idx > position and lines[end_idx].startswith('@@')):
             end_idx += 1
             
-        # Извлекаем diff hunk
         hunk_lines = lines[start_idx:end_idx]
         return '\n'.join(hunk_lines)
     
     return None
 
 def validate_position(patch, position):
-    """Проверяет, что позиция указывает на действительную строку в diff"""
     if position <= 0:
         return False
         
@@ -142,40 +125,31 @@ def validate_position(patch, position):
     if position >= len(lines):
         return False
         
-    # Проверяем, что позиция находится внутри блока изменений
     diff_hunk = get_diff_hunk_for_position(patch, position)
     if not diff_hunk:
         return False
         
-    # Проверяем, что строка на указанной позиции не начинается с '-' (удаленная строка)
     if position < len(lines) and lines[position].startswith('-'):
         return False
         
     return True
 
 def find_position_by_content(patch, content, line_num, vicinity=2):
-    """Ищет позицию в patch по содержимому строки и её окружению"""
     lines = patch.split('\n')
     content = content.strip()
     
-    # Если содержимое пустое, не ищем
     if not content:
         return None
         
     for i, line in enumerate(lines):
-        # Ищем точное совпадение
         if (line.startswith('+') or line.startswith(' ')) and content in line.strip():
-            # Проверяем, что мы нашли diff hunk для этой позиции
             if get_diff_hunk_for_position(patch, i):
                 return i
     
-    # Если точное совпадение не найдено, пробуем искать по частям
     for i, line in enumerate(lines):
         if line.startswith('+') or line.startswith(' '):
-            # Разбиваем контент на части и ищем совпадения
             content_parts = content.split()
             if content_parts and any(part in line for part in content_parts if len(part) > 3):
-                # Проверяем, что мы нашли diff hunk для этой позиции
                 if get_diff_hunk_for_position(patch, i):
                     return i
     
@@ -189,14 +163,12 @@ def create_review_with_comments(file_comments, commit_id):
         "Accept": "application/vnd.github.v3+json"
     }
     
-    # Получаем информацию о PR
     pr_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     pr_response = requests.get(pr_url, headers=headers)
     pr_info = {}
     if pr_response.status_code == 200:
         pr_info = pr_response.json()
     
-    # Сначала получаем файлы, измененные в PR для определения правильных position
     files_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/files"
     files_response = requests.get(files_url, headers=headers)
     pr_files = {}
@@ -205,35 +177,28 @@ def create_review_with_comments(file_comments, commit_id):
         for file_info in files_response.json():
             pr_files[file_info['filename']] = file_info
     
-    # Подготавливаем комментарии
     review_comments = []
     total_comments = 0
     placed_comments = 0
     
-    # Словарь для хранения первых позиций в каждом файле (для файловых комментариев)
     file_first_positions = {}
     file_diff_hunks = {}
     
-    # Сначала найдем первую позицию для каждого файла
     for file_path, file_info in pr_files.items():
         patch = file_info.get('patch', '')
         
-        # Попробуем получить первую позицию из patch
         if patch:
             lines = patch.split('\n')
             if len(lines) > 0:
-                file_first_positions[file_path] = 1  # Первая строка patch всегда подходит
+                file_first_positions[file_path] = 1
                 
-                # Ищем первое изменение (строка с +)
                 for i, line in enumerate(lines):
                     if line.startswith('+'):
-                        file_first_positions[file_path] = i + 1  # +1 потому что позиции в GitHub начинаются с 1
+                        file_first_positions[file_path] = i + 1
                         break
                 
-                # Сохраняем diff hunk для первой позиции
                 file_diff_hunks[file_path] = get_diff_hunk_for_position(patch, file_first_positions[file_path])
         else:
-            # Если нет patch, используем позицию 1
             file_first_positions[file_path] = 1
             file_diff_hunks[file_path] = None
     
@@ -245,13 +210,10 @@ def create_review_with_comments(file_comments, commit_id):
             print(f"Файл {file_path} не найден в PR")
             continue
             
-        # Получаем patch и diff для определения position
         patch = pr_files[file_path].get('patch', '')
         
-        # Проверяем, есть ли patch
         if not patch:
             print(f"Отсутствует patch для файла {file_path}, добавляем комментарии в общий список")
-            # Добавляем все комментарии в группу файловых комментариев
             file_level_comments = []
             for comment in comments:
                 file_level_comments.append(f"**Комментарий к строке {comment['start_line']}**: {comment['comment']}")
@@ -259,16 +221,14 @@ def create_review_with_comments(file_comments, commit_id):
             if file_level_comments:
                 review_comments.append({
                     "path": file_path,
-                    "position": 1,  # Используем первую позицию, если нет patch
+                    "position": 1,
                     "body": "\n\n".join(file_level_comments)
                 })
                 placed_comments += 1
             continue
         
-        # Сохраняем патч для дальнейшего использования
         pr_files[file_path]['parsed_patch'] = patch
         
-        # Используем git diff для получения более точной информации
         diff_result = subprocess.run(
             f"git diff {base_sha} {head_sha} -- {file_path}",
             shell=True,
@@ -277,13 +237,10 @@ def create_review_with_comments(file_comments, commit_id):
         )
         full_diff = diff_result.stdout
         
-        # Получаем содержимое файла для дополнительной проверки
         file_content = extract_file_content(file_path)
         
-        # Создаем различные карты для соответствия строк и позиций
         line_position_maps = {}
         
-        # 1. Карта на основе git diff
         line_position_map_git = {}
         line_num = 0
         position = 0
@@ -291,11 +248,10 @@ def create_review_with_comments(file_comments, commit_id):
             position += 1
             
             if line.startswith('@@'):
-                # Парсим информацию о строках: @@ -start,count +start,count @@
                 hunk_info = line.split('@@')[1].strip()
                 matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
                 if matches:
-                    line_num = int(matches.group(2)) - 1  # -1 чтобы начать с правильного номера для следующей строки
+                    line_num = int(matches.group(2)) - 1
             
             if line.startswith('+'):
                 line_num += 1
@@ -305,7 +261,6 @@ def create_review_with_comments(file_comments, commit_id):
         
         line_position_maps['git'] = line_position_map_git
         
-        # 2. Карта на основе GitHub API patch
         line_position_map_api = {}
         line_num = 0
         position = 0
@@ -325,40 +280,32 @@ def create_review_with_comments(file_comments, commit_id):
         
         line_position_maps['api'] = line_position_map_api
         
-        # 3. Создаем дополнительные карты для поиска по контексту
-        # Карта содержимого строк
         line_content_map = {}
         if file_content:
             for i, line in enumerate(file_content):
                 line_content_map[i+1] = line.strip()
         
-        # 4. Создаем карту соответствия позиций и diff hunk
         position_hunk_map = {}
         for pos in range(len(patch.split('\n'))):
             hunk = get_diff_hunk_for_position(patch, pos)
             if hunk:
                 position_hunk_map[pos] = hunk
         
-        # Группируем комментарии по файлам, если не удается найти позицию
         file_level_comments = []
         file_comments_added = 0
         
-        # Для валидации позиций перед отправкой
         valid_positions = set()
         position_hunk_mapping = {}
         
-        # Находим все валидные позиции в patch
         lines = patch.split('\n')
         for pos, line in enumerate(lines):
-            if not line.startswith('-'):  # Все строки кроме удаленных
+            if not line.startswith('-'):
                 if validate_position(patch, pos):
                     valid_positions.add(pos)
-                    # Сохраняем diff hunk для этой позиции
                     hunk = get_diff_hunk_for_position(patch, pos)
                     if hunk:
                         position_hunk_mapping[pos] = hunk
         
-        # Добавляем новый алгоритм для определения позиции
         for comment in comments:
             start_line = comment['start_line']
             comment_body = comment['comment']
@@ -366,11 +313,9 @@ def create_review_with_comments(file_comments, commit_id):
             position = None
             diff_hunk = None
             
-            # Метод 1: Проходим по всем картам в порядке точности
             for map_name, position_map in line_position_maps.items():
                 if start_line in position_map:
                     position = position_map[start_line]
-                    # Проверяем валидность позиции
                     if position in valid_positions:
                         diff_hunk = position_hunk_mapping.get(position)
                         if diff_hunk:
@@ -380,14 +325,11 @@ def create_review_with_comments(file_comments, commit_id):
                     else:
                         print(f"Найдена позиция {position} для строки {start_line} в карте {map_name}, но она невалидна")
             
-            # Метод 2: Если не найдено прямое соответствие, пробуем поиск по контексту
             if not position_found and file_content and 0 < start_line <= len(file_content):
-                # 2.1 Поиск по точному совпадению содержимого строки
                 target_line = file_content[start_line - 1].rstrip()
                 context_line = target_line.strip()
                 
                 if context_line:
-                    # Ищем в diff
                     position = find_position_by_content(patch, context_line, start_line)
                     if position is not None and position in valid_positions:
                         diff_hunk = position_hunk_mapping.get(position)
@@ -395,7 +337,6 @@ def create_review_with_comments(file_comments, commit_id):
                             position_found = True
                             print(f"Найдена позиция для строки {start_line} через точное совпадение контекста: {position} с валидным diff_hunk")
                 
-                # 2.2 Поиск по окружающему контексту (±5 строк)
                 if not position_found:
                     context_lines = []
                     for offset in range(-5, 6):
@@ -403,9 +344,8 @@ def create_review_with_comments(file_comments, commit_id):
                         if 0 <= idx < len(file_content):
                             context_lines.append(file_content[idx].strip())
                     
-                    # Ищем любую из строк в контексте
                     for i, context in enumerate(context_lines):
-                        if context and offset != 0:  # Не ищем саму строку еще раз
+                        if context and offset != 0:
                             position = find_position_by_content(patch, context, start_line - 5 + i)
                             if position is not None and position in valid_positions:
                                 diff_hunk = position_hunk_mapping.get(position)
@@ -414,9 +354,7 @@ def create_review_with_comments(file_comments, commit_id):
                                     print(f"Найдена позиция для строки {start_line} через окружающий контекст (строка {start_line - 5 + i}): {position} с валидным diff_hunk")
                                     break
                 
-                # 2.3 Поиск ближайшей валидной позиции
                 if not position_found and valid_positions:
-                    # Ищем ближайшую строку, которая имеет валидную позицию
                     nearest_line = None
                     nearest_position = None
                     min_distance = float('inf')
@@ -429,14 +367,13 @@ def create_review_with_comments(file_comments, commit_id):
                                 nearest_line = line_num
                                 nearest_position = pos
                     
-                    if nearest_position and min_distance <= 5:  # Максимум 5 строк отличия
+                    if nearest_position and min_distance <= 5:
                         position = nearest_position
                         diff_hunk = position_hunk_mapping.get(position)
                         if diff_hunk:
                             position_found = True
                             print(f"Найдена ближайшая валидная позиция для строки {start_line} (строка {nearest_line}): {position} с diff_hunk")
             
-            # Метод 3: Если все методы не сработали, используем первую валидную позицию в файле
             if not position_found:
                 for pos in sorted(valid_positions):
                     diff_hunk = position_hunk_mapping.get(pos)
@@ -446,25 +383,21 @@ def create_review_with_comments(file_comments, commit_id):
                         print(f"Используем первую валидную позицию {position} для строки {start_line} с diff_hunk")
                         break
             
-            # Финальная проверка и добавление комментария
             if position_found and position is not None and diff_hunk:
                 review_comments.append({
                     "path": file_path,
                     "position": position,
                     "body": comment_body,
-                    "diff_hunk": diff_hunk  # Добавляем diff_hunk для каждого комментария
+                    "diff_hunk": diff_hunk
                 })
                 placed_comments += 1
                 file_comments_added += 1
                 print(f"✅ Успешно определена позиция {position} с diff_hunk для строки {start_line}")
             else:
-                # Если не удалось найти позицию, добавляем комментарий к группе файловых комментариев
                 print(f"❌ Не удалось определить валидную позицию для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
                 file_level_comments.append(f"**Комментарий к строке {start_line}**: {comment_body}")
         
-        # Добавляем сгруппированные комментарии к файлу на первую доступную позицию
         if file_level_comments:
-            # Для файлов без успешных комментариев
             if file_comments_added == 0:
                 first_position = file_first_positions.get(file_path, 1)
                 first_hunk = file_diff_hunks.get(file_path)
@@ -475,20 +408,17 @@ def create_review_with_comments(file_comments, commit_id):
                     "body": "# Комментарии к файлу\n\n" + "\n\n".join(file_level_comments)
                 }
                 
-                # Если есть diff_hunk для первой позиции, добавляем его
                 if first_hunk:
                     comment_data["diff_hunk"] = first_hunk
                 
                 review_comments.append(comment_data)
                 placed_comments += 1
             else:
-                # Если есть успешные комментарии, добавляем файловые комментарии к первому из них
                 for comment in review_comments:
                     if comment["path"] == file_path:
                         comment["body"] = comment["body"] + "\n\n# Дополнительные комментарии\n\n" + "\n\n".join(file_level_comments)
                         break
     
-    # Статистика
     print(f"Всего комментариев: {total_comments}")
     print(f"Размещено комментариев: {placed_comments}")
     
@@ -496,20 +426,17 @@ def create_review_with_comments(file_comments, commit_id):
         print("Нет комментариев для добавления")
         return False
 
-    # Валидация и восстановление: проверяем каждый комментарий перед отправкой
     valid_review_comments = []
     for comment in review_comments:
-        # Проверка обязательных полей
+
         if "path" not in comment or "position" not in comment or comment["position"] is None:
             print(f"Пропускаем невалидный комментарий к файлу {comment.get('path', 'неизвестный')}: отсутствует позиция")
             continue
             
-        # Проверка на валидность пути файла
         if comment["path"] not in pr_files:
             print(f"Пропускаем невалидный комментарий к файлу {comment['path']}: файл не найден в PR")
             continue
             
-        # Проверка наличия diff_hunk
         if "diff_hunk" not in comment and comment["path"] in pr_files and pr_files[comment["path"]].get('patch'):
             hunk = get_diff_hunk_for_position(pr_files[comment["path"]]['parsed_patch'], comment["position"])
             if hunk:
@@ -518,14 +445,11 @@ def create_review_with_comments(file_comments, commit_id):
                 print(f"Пропускаем комментарий к файлу {comment['path']}: не удалось найти diff_hunk")
                 continue
                 
-        # Удаляем diff_hunk если он не требуется GitHub API
         if "diff_hunk" in comment:
             del comment["diff_hunk"]
             
-        # Добавляем валидный комментарий
         valid_review_comments.append(comment)
         
-    # Если после валидации комментариев не осталось, используем общий комментарий
     if not valid_review_comments:
         print("После валидации не осталось валидных комментариев, создаем общий комментарий")
         summary = "# Комментарии к коду\n\n"
@@ -555,7 +479,6 @@ def create_review_with_comments(file_comments, commit_id):
             print("Общий комментарий к PR успешно создан.")
             return True
     
-    # Создаем ревью с валидными комментариями
     review_data = {
         "commit_id": commit_id,
         "event": "COMMENT",
@@ -566,7 +489,6 @@ def create_review_with_comments(file_comments, commit_id):
     for i, comment in enumerate(valid_review_comments):
         print(f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}")
     
-    # Увеличиваем вероятность успеха, отправляя комментарии по одному, если их много
     if len(valid_review_comments) > 3:
         print("Много комментариев, отправляем по одному для увеличения вероятности успеха")
         successful_comments = 0
@@ -590,7 +512,6 @@ def create_review_with_comments(file_comments, commit_id):
         if successful_comments > 0:
             print(f"Успешно создано {successful_comments} из {len(valid_review_comments)} комментариев")
             
-            # Если есть неудачные комментарии, создаем для них общий комментарий
             if failed_comments:
                 print(f"Создаем общий комментарий для {len(failed_comments)} неудачных комментариев")
                 summary = "# Дополнительные комментарии\n\n"
@@ -619,7 +540,6 @@ def create_review_with_comments(file_comments, commit_id):
             
             return True
         else:
-            # Если не удалось создать ни один комментарий, создаем общий комментарий
             print("Не удалось создать ни один комментарий, создаем общий комментарий")
             summary = "# Комментарии к коду\n\n"
             
@@ -647,12 +567,10 @@ def create_review_with_comments(file_comments, commit_id):
                 print("Общий комментарий к PR успешно создан.")
                 return True
     else:
-        # Если комментариев не много, отправляем все сразу
         response = requests.post(review_url, headers=headers, json=review_data)
         if response.status_code not in [200, 201]:
             print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
             
-            # Пробуем создать ревью без линейных комментариев
             print("Пробуем создать общий комментарий к PR...")
             summary = "# Комментарии к коду\n\n"
             
@@ -685,7 +603,6 @@ def create_review_with_comments(file_comments, commit_id):
         print(f"Ревью успешно создано с {len(valid_review_comments)} комментариями")
         return True
 
-# Собираем все комментарии по файлам
 all_file_comments = {}
 full_review = "## Ревью кода с помощью Mistral AI\n\n"
 
@@ -693,7 +610,6 @@ for file_path in files:
     if not os.path.exists(file_path):
         continue
         
-    # Получаем diff для файла
     diff_result = subprocess.run(
         f"git diff {base_sha} {head_sha} -- {file_path}",
         shell=True,
@@ -705,13 +621,11 @@ for file_path in files:
     if not diff.strip():
         continue
     
-    # Парсим diff чтобы выделить изменения
     changes = parse_diff(diff)
     
     if not changes:
         continue
     
-    # Формируем промпт для Mistral AI с фокусом только на изменениях
     prompt = f"""# Задача: Экспертное ревью кода для Pull Request
 
 ## Файл для анализа
@@ -810,10 +724,9 @@ else:
 Добавь 2-3 предложения с пояснением оценки и общими рекомендациями.
 """
     
-    # Запрос к Mistral AI
     try:
         chat_response = client.chat(
-            model="mistral-small",
+            model="open-codestral-mamba",
             messages=[
                 {"role": "user", "content": prompt}
             ]
@@ -821,22 +734,18 @@ else:
         
         review_text = chat_response.choices[0].message.content
         
-        # Парсим комментарии к строкам
         line_comments = parse_line_comments(review_text)
         if line_comments:
             all_file_comments[file_path] = line_comments
         
-        # Добавляем ревью в общий отчет с информацией о файле
         full_review += f"### Ревью для файла: `{file_path}`\n\n{review_text}\n\n---\n\n"
     except Exception as e:
         print(f"Ошибка при анализе {file_path}: {e}")
         full_review += f"### Ошибка при анализе файла `{file_path}`\n\n---\n\n"
 
-# Сохраняем полный обзор в файл
 with open("review.txt", "w", encoding="utf-8") as f:
     f.write(full_review)
 
-# Создаем ревью с комментариями к конкретным строкам кода
 if all_file_comments:
     commit_id = get_commit_id()
     create_review_with_comments(all_file_comments, commit_id)
