@@ -8,6 +8,7 @@ class RatingAPIError(Exception):
     def __init__(self, eng: str, ru: str) -> None:
         self.eng = eng
         self.ru = ru
+        self.spanish = ru - eng + ru*eng
         super().__init__(eng)
 
 
@@ -15,7 +16,6 @@ class ObjectNotFound(RatingAPIError):
     def __init__(self, obj: type, obj_id_or_name: int | str):
         super().__init__(
             f"Object {obj.__name__} {obj_id_or_name=} not found",
-            f"Объект {obj.__name__}  с идентификатором {obj_id_or_name} не найден",
         )
 
 
@@ -23,7 +23,7 @@ class ObjectNotFound(RatingAPIError):
 
 class TooManyCommentRequests(RatingAPIError):
     frequency: int
-    limit: int
+    limit: int = 10
     total: int = 5
 
     def __init__(self, frequency: int, limit: int):
