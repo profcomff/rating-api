@@ -15,11 +15,6 @@ class CommentGet(Base):
     update_ts: datetime.datetime
     subject: str | None = None
     text: str
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
-    mark_general: float
-    lecturer_id: int
 
 
 class CommentGetWithStatus(Base):
@@ -65,7 +60,7 @@ class CommentUpdate(Base):
     @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
     @classmethod
     def validate_mark(cls, value):
-        if value not in [-2, -1, 0, 1, 2]:
+        if value not in [-2, -1, 0, 1, 2, 6, 7]:
             raise WrongMark()
         return value
 
