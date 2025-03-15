@@ -761,7 +761,7 @@ class UserRepository:
     # Запрос к Mistral AI
     try:
         chat_response = client.chat(
-            model="mistral-large",
+            model="open-codestral-mamba",
             messages=[
                 {"role": "user", "content": prompt}
             ]
