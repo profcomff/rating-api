@@ -172,6 +172,23 @@ def create_review_with_comments(file_comments, commit_id):
         # Получаем patch и diff для определения position
         patch = pr_files[file_path].get('patch', '')
         
+        # Проверяем, есть ли patch
+        if not patch:
+            print(f"Отсутствует patch для файла {file_path}, добавляем комментарии в общий список")
+            # Добавляем все комментарии в группу файловых комментариев
+            file_level_comments = []
+            for comment in comments:
+                file_level_comments.append(f"**Комментарий к строке {comment['start_line']}**: {comment['comment']}")
+            
+            if file_level_comments:
+                review_comments.append({
+                    "path": file_path,
+                    "position": 1,  # Используем первую позицию, если нет patch
+                    "body": "\n\n".join(file_level_comments)
+                })
+                placed_comments += 1
+            continue
+        
         # Используем git diff для получения более точной информации
         diff_result = subprocess.run(
             f"git diff {base_sha} {head_sha} -- {file_path}",
@@ -184,16 +201,13 @@ def create_review_with_comments(file_comments, commit_id):
         # Получаем содержимое файла для дополнительной проверки
         file_content = extract_file_content(file_path)
         
-        # Создаем карту номеров строк и позиций
-        line_position_map = {}
+        # Создаем различные карты для соответствия строк и позиций
+        line_position_maps = {}
+        
+        # 1. Карта на основе git diff
+        line_position_map_git = {}
         line_num = 0
         position = 0
-        
-        # Если это первый файл, убедимся, что он имеет позицию
-        if file_path not in file_first_positions:
-            file_first_positions[file_path] = 1
-        
-        # Парсим diff для определения позиций
         for line in full_diff.split('\n'):
             position += 1
             
@@ -206,89 +220,170 @@ def create_review_with_comments(file_comments, commit_id):
             
             if line.startswith('+'):
                 line_num += 1
-                line_position_map[line_num] = position
+                line_position_map_git[line_num] = position
             elif line.startswith(' '):
                 line_num += 1
         
-        # Также создаем альтернативную карту из patch в API
-        api_line_position_map = {}
+        line_position_maps['git'] = line_position_map_git
+        
+        # 2. Карта на основе GitHub API patch
+        line_position_map_api = {}
         line_num = 0
         position = 0
+        for line in patch.split('\n'):
+            position += 1
+            
+            if line.startswith('@@'):
+                matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', line.split('@@')[1].strip())
+                if matches:
+                    line_num = int(matches.group(2)) - 1
+            
+            if line.startswith('+'):
+                line_num += 1
+                line_position_map_api[line_num] = position
+            elif line.startswith(' '):
+                line_num += 1
         
-        if patch:
-            for line in patch.split('\n'):
-                if line.startswith('@@'):
-                    matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', line.split('@@')[1].strip())
-                    if matches:
-                        line_num = int(matches.group(2)) - 1
-                
-                position += 1
-                
-                if line.startswith('+'):
-                    line_num += 1
-                    api_line_position_map[line_num] = position
-                elif line.startswith(' '):
-                    line_num += 1
+        line_position_maps['api'] = line_position_map_api
+        
+        # 3. Создаем дополнительные карты для поиска по контексту
+        # Карта содержимого строк
+        line_content_map = {}
+        if file_content:
+            for i, line in enumerate(file_content):
+                line_content_map[i+1] = line.strip()
         
         # Группируем комментарии по файлам, если не удается найти позицию
         file_level_comments = []
+        file_comments_added = 0
         
-        # Добавляем новый метод для определения позиции: поиск контекста
+        # Для валидации позиций перед отправкой
+        valid_positions = set()
+        for line in patch.split('\n'):
+            if not line.startswith('-'):  # Все строки кроме удаленных
+                valid_positions.add(position)
+        
+        # Добавляем новый алгоритм для определения позиции
         for comment in comments:
             start_line = comment['start_line']
             comment_body = comment['comment']
             position_found = False
+            position = None
             
-            # 1. Попробуем найти прямое соответствие в нашей карте из diff
-            if start_line in line_position_map:
-                position = line_position_map[start_line]
-                position_found = True
-                print(f"Найдена позиция для строки {start_line} в карте из diff: {position}")
+            # Проходим по всем картам в порядке точности
+            for map_name, position_map in line_position_maps.items():
+                if start_line in position_map:
+                    position = position_map[start_line]
+                    position_found = True
+                    print(f"Найдена позиция для строки {start_line} в карте {map_name}: {position}")
+                    break
             
-            # 2. Попробуем найти в карте из API
-            elif start_line in api_line_position_map:
-                position = api_line_position_map[start_line]
-                position_found = True
-                print(f"Найдена позиция для строки {start_line} в карте из API: {position}")
-            
-            # 3. Если все еще не найдено, попробуем использовать относительную позицию
-            elif file_content and 0 < start_line <= len(file_content):
-                # Найдем контекст строки в файле
+            # Если не найдено прямое соответствие, пробуем поиск по контексту
+            if not position_found and file_content and 0 < start_line <= len(file_content):
+                # 1. Поиск по точному совпадению содержимого строки
                 target_line = file_content[start_line - 1].rstrip()
                 context_line = target_line.strip()
                 
                 if context_line:
-                    # Ищем эту строку в diff
+                    # Ищем в diff
                     lines = full_diff.split('\n')
                     for i, line in enumerate(lines):
                         if line.startswith('+') and context_line in line.strip():
-                            # Вычисляем position относительно начала diff
-                            position = i + 1  # +1 потому что позиции в GitHub начинаются с 1
+                            position = i + 1
                             position_found = True
-                            print(f"Найдена позиция для строки {start_line} через контекст: {position}")
+                            print(f"Найдена позиция для строки {start_line} через точное совпадение контекста: {position}")
                             break
+                
+                # 2. Поиск по окружающему контексту (±2 строки)
+                if not position_found:
+                    context_lines = []
+                    for offset in range(-2, 3):
+                        idx = start_line - 1 + offset
+                        if 0 <= idx < len(file_content):
+                            context_lines.append(file_content[idx].strip())
+                    
+                    # Ищем последовательность строк в diff
+                    if context_lines:
+                        lines = full_diff.split('\n')
+                        for i in range(len(lines) - len(context_lines) + 1):
+                            match_count = 0
+                            for j, context in enumerate(context_lines):
+                                if context and i+j < len(lines) and context in lines[i+j].strip():
+                                    match_count += 1
+                            
+                            # Если нашли достаточно совпадений
+                            if match_count >= 2:  # Минимум 2 совпадения из 5 строк
+                                # Позиция соответствует середине контекста
+                                position = i + 2  # +2 для учета середины контекста
+                                position_found = True
+                                print(f"Найдена позиция для строки {start_line} через окружающий контекст: {position}")
+                                break
+                
+                # 3. Поиск ближайшей измененной строки (для комментариев к строкам рядом с измененными)
+                if not position_found:
+                    nearest_line = None
+                    min_distance = float('inf')
+                    
+                    for line_num in line_position_map_git.keys():
+                        distance = abs(line_num - start_line)
+                        if distance < min_distance:
+                            min_distance = distance
+                            nearest_line = line_num
+                    
+                    if nearest_line and min_distance <= 3:  # Максимум 3 строки отличия
+                        position = line_position_map_git[nearest_line]
+                        position_found = True
+                        print(f"Найдена позиция для строки {start_line} через ближайшую измененную строку {nearest_line}: {position}")
             
+            # Проверяем, что позиция валидна
             if position_found:
+                # Если позиция указывает на удаленную строку, корректируем
+                if position > 0 and not position in valid_positions:
+                    patch_lines = patch.split('\n')
+                    # Ищем ближайшую неудаленную строку
+                    for i in range(1, 5):  # Проверяем в радиусе 5 строк
+                        if position + i in valid_positions:
+                            position = position + i
+                            break
+                        elif position - i in valid_positions:
+                            position = position - i
+                            break
+                    
+                    print(f"Скорректирована позиция для строки {start_line}: {position}")
+                
+                # Проверяем на выход за пределы диапазона
+                if position < 1:
+                    position = 1  # Минимальная позиция
+                
                 review_comments.append({
                     "path": file_path,
                     "position": position,
                     "body": comment_body
                 })
                 placed_comments += 1
+                file_comments_added += 1
             else:
                 # Если не удалось найти позицию, добавляем комментарий к группе файловых комментариев
-                print(f"Не удалось определить position для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
+                print(f"Не удалось определить позицию для строки {start_line} в файле {file_path}, добавлен комментарий к файлу")
                 file_level_comments.append(f"**Комментарий к строке {start_line}**: {comment_body}")
         
         # Добавляем сгруппированные комментарии к файлу на первую доступную позицию
         if file_level_comments:
-            first_position = file_first_positions.get(file_path, 1)  # Если нет позиции, используем 1
-            review_comments.append({
-                "path": file_path,
-                "position": first_position,
-                "body": "\n\n".join(file_level_comments)
-            })
-            placed_comments += 1
+            # Для файлов без успешных комментариев
+            if file_comments_added == 0:
+                first_position = file_first_positions.get(file_path, 1)
+                review_comments.append({
+                    "path": file_path,
+                    "position": first_position,
+                    "body": "# Комментарии к файлу\n\n" + "\n\n".join(file_level_comments)
+                })
+                placed_comments += 1
+            else:
+                # Если есть успешные комментарии, добавляем файловые комментарии к первому из них
+                for comment in review_comments:
+                    if comment["path"] == file_path:
+                        comment["body"] = comment["body"] + "\n\n# Дополнительные комментарии\n\n" + "\n\n".join(file_level_comments)
+                        break
     
     # Статистика
     print(f"Всего комментариев: {total_comments}")
@@ -297,35 +392,92 @@ def create_review_with_comments(file_comments, commit_id):
     if not review_comments:
         print("Нет комментариев для добавления")
         return False
+
+    # Валидация и восстановление: проверяем каждый комментарий перед отправкой
+    valid_review_comments = []
+    for comment in review_comments:
+        # Проверка обязательных полей
+        if "path" not in comment or "position" not in comment or comment["position"] is None:
+            print(f"Пропускаем невалидный комментарий к файлу {comment.get('path', 'неизвестный')}: отсутствует позиция")
+            continue
+            
+        # Проверка на валидность пути файла
+        if comment["path"] not in pr_files:
+            print(f"Пропускаем невалидный комментарий к файлу {comment['path']}: файл не найден в PR")
+            continue
+            
+        # Добавляем валидный комментарий
+        valid_review_comments.append(comment)
+        
+    # Если после валидации комментариев не осталось, используем общий комментарий
+    if not valid_review_comments:
+        print("После валидации не осталось валидных комментариев, создаем общий комментарий")
+        summary = "# Комментарии к коду\n\n"
+        
+        for file_path, comments in file_comments.items():
+            summary += f"## Файл: {file_path}\n\n"
+            for comment in comments:
+                summary += f"**Строка {comment['start_line']}**: {comment['comment']}\n\n"
+            summary += "---\n\n"
+        
+        review_data = {
+            "commit_id": commit_id,
+            "event": "COMMENT",
+            "body": summary
+        }
+        
+        response = requests.post(
+            f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+            headers=headers,
+            json=review_data
+        )
+        
+        if response.status_code not in [200, 201]:
+            print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+            return False
+        else:
+            print("Общий комментарий к PR успешно создан.")
+            return True
     
-    # Проверка, что все комментарии имеют позицию
-    for i, comment in enumerate(review_comments):
-        if "position" not in comment or comment["position"] is None:
-            # Если позиция отсутствует, установим её в 1
-            print(f"Исправляем отсутствующую позицию для комментария {i} к файлу {comment['path']}")
-            comment["position"] = 1
-    
-    # Создаем ревью
+    # Создаем ревью с валидными комментариями
     review_data = {
         "commit_id": commit_id,
         "event": "COMMENT",
-        "comments": review_comments
+        "comments": valid_review_comments
     }
     
-    print(f"Отправляем запрос на создание ревью с {len(review_comments)} комментариями")
-    for i, comment in enumerate(review_comments):
+    print(f"Отправляем запрос на создание ревью с {len(valid_review_comments)} комментариями")
+    for i, comment in enumerate(valid_review_comments):
         print(f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}")
     
-    response = requests.post(review_url, headers=headers, json=review_data)
-    if response.status_code not in [200, 201]:
-        print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
+    # Увеличиваем вероятность успеха, отправляя комментарии по одному, если их много
+    if len(valid_review_comments) > 5:
+        print("Много комментариев, отправляем по одному для увеличения вероятности успеха")
+        successful_comments = 0
         
-        # Пробуем создать ревью без линейных комментариев
-        if "comments" in review_data:
-            print("Пробуем создать общий комментарий к PR...")
+        for i, comment in enumerate(valid_review_comments):
+            single_review_data = {
+                "commit_id": commit_id,
+                "event": "COMMENT",
+                "comments": [comment]
+            }
+            
+            single_response = requests.post(review_url, headers=headers, json=single_review_data)
+            if single_response.status_code in [200, 201]:
+                successful_comments += 1
+                print(f"Успешно создан комментарий {i+1}/{len(valid_review_comments)}")
+            else:
+                print(f"Ошибка при создании комментария {i+1}: {single_response.status_code} - {single_response.text}")
+        
+        if successful_comments > 0:
+            print(f"Успешно создано {successful_comments} из {len(valid_review_comments)} комментариев")
+            return True
+        else:
+            # Если не удалось создать ни один комментарий, создаем общий комментарий
+            print("Не удалось создать ни один комментарий, создаем общий комментарий")
             summary = "# Комментарии к коду\n\n"
             
-            for comment in review_comments:
+            for comment in valid_review_comments:
                 file_path = comment.get("path", "неизвестный файл")
                 body = comment.get("body", "")
                 summary += f"## Файл: {file_path}\n\n{body}\n\n---\n\n"
@@ -348,11 +500,44 @@ def create_review_with_comments(file_comments, commit_id):
             else:
                 print("Общий комментарий к PR успешно создан.")
                 return True
+    else:
+        # Если комментариев не много, отправляем все сразу
+        response = requests.post(review_url, headers=headers, json=review_data)
+        if response.status_code not in [200, 201]:
+            print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
+            
+            # Пробуем создать ревью без линейных комментариев
+            print("Пробуем создать общий комментарий к PR...")
+            summary = "# Комментарии к коду\n\n"
+            
+            for comment in valid_review_comments:
+                file_path = comment.get("path", "неизвестный файл")
+                body = comment.get("body", "")
+                summary += f"## Файл: {file_path}\n\n{body}\n\n---\n\n"
+            
+            review_data = {
+                "commit_id": commit_id,
+                "event": "COMMENT",
+                "body": summary
+            }
+            
+            response = requests.post(
+                f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+                headers=headers,
+                json=review_data
+            )
+            
+            if response.status_code not in [200, 201]:
+                print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+                return False
+            else:
+                print("Общий комментарий к PR успешно создан.")
+                return True
+            
+            return False
         
-        return False
-    
-    print(f"Ревью успешно создано с {len(review_comments)} комментариями")
-    return True
+        print(f"Ревью успешно создано с {len(valid_review_comments)} комментариями")
+        return True
 
 # Собираем все комментарии по файлам
 all_file_comments = {}
