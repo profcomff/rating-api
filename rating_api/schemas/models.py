@@ -14,12 +14,6 @@ class CommentGet(Base):
     create_ts: datetime.datetime
     update_ts: datetime.datetime
     subject: str | None = None
-    text: str
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
-    mark_general: float
-    lecturer_id: int
 
 
 class CommentGetWithStatus(Base):
