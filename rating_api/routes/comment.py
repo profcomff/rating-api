@@ -252,7 +252,7 @@ async def delete_comment(
     if not has_delete_scope:
         if comment.is_anonymous or comment.user_id != user.id:
             raise ForbiddenAction(Comment)
-        
+    #
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
