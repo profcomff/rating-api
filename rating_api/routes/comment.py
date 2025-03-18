@@ -243,7 +243,7 @@ async def delete_comment(
     Удаляет комментарий по его UUID в базе данных RatingAPI
     """
     comment = Comment.get(uuid, session=db.session)
-    if comment is None: 
+    if comment is None:
         raise ObjectNotFound(Comment, uuid)
     # Наличие скоупа для удаления любых комментариев
     has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
