@@ -1,10 +1,12 @@
-import os
-import sys
 import json
-import requests
-import subprocess
+import os
 import re
+import subprocess
+import sys
+
+import requests
 from mistralai.client import MistralClient
+
 
 client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
 

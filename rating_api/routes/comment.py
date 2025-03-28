@@ -308,7 +308,7 @@ async def delete_comment(
 
     # Если нет привилегии - проверяем права обычного пользователя
     if not has_delete_scope:
-        if comment.is_anonymous:
+        if comment.is_anonymous: 
             raise ForbiddenAction(Comment)
 
     if not has_delete_scope or comment.user_id != user.id:
