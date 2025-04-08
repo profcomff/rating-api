@@ -1,5 +1,6 @@
 import datetime
-from typing import Literal
+import re
+from typing import Literal, Union
 from uuid import UUID
 
 import aiohttp
@@ -9,10 +10,27 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import func, select
 from sqlalchemy.orm import aliased
 
-from rating_api.exceptions import ForbiddenAction, ObjectNotFound, TooManyCommentRequests, TooManyCommentsToLecturer
+
+from rating_api.exceptions import (
+    CommentTooLong,
+    ForbiddenAction,
+    ForbiddenSymbol,
+    ObjectNotFound,
+    TooManyCommentRequests,
+    TooManyCommentsToLecturer,
+    UpdateError,
+)
 from rating_api.models import Comment, CommentLike, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, CommentGetAll, CommentImportAll, CommentPost
+from rating_api.schemas.models import (
+    CommentGet,
+    CommentGetAll,
+    CommentGetAllWithStatus,
+    CommentGetWithStatus,
+    CommentImportAll,
+    CommentPost,
+    CommentUpdate,
+)
 from rating_api.settings import Settings, get_settings
 
 
@@ -23,59 +41,55 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
-    Scopes: `["rating.comment.import"]`
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
-
-    Для возможности создания комментария с указанием времени создания и изменения необходим скоуп ["rating.comment.import"]
     """
-    lecturer = Lecturer.get(session=db.session, id=lecturer_id)
+    # Проверяем, что лектор с заданным id существует
+    Lecturer.get(session=db.session, id=lecturer_id)
+
     now = datetime.datetime.now(tz=datetime.timezone.utc)
-
-    if not lecturer:
-        raise ObjectNotFound(Lecturer, lecturer_id)
-
-    has_create_scope = "rating.comment.import" in [scope['name'] for scope in user.get('session_scopes')]
-    if (comment_info.create_ts or comment_info.update_ts) and not has_create_scope:
-        raise ForbiddenAction(Comment)
-
-    if not has_create_scope:
-        # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
-        date_count = datetime.datetime(
-            now.year + (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12,
-            (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12,
-            1,
+    # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
+    cutoff_date_total = datetime.datetime(
+        now.year + (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12,
+        (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12,
+        1,
+    )
+    total_user_comments_count = (
+        LecturerUserComment.query(session=db.session)
+        .filter(
+            LecturerUserComment.user_id == user.get("id"),
+            LecturerUserComment.update_ts >= cutoff_date_total,
         )
-        user_comments_count = (
-            LecturerUserComment.query(session=db.session)
-            .filter(
-                LecturerUserComment.user_id == user.get("id"),
-                LecturerUserComment.update_ts >= date_count,
-            )
-            .count()
-        )
-        if user_comments_count >= settings.COMMENT_LIMIT:
-            raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
+        .count()
+    )
+    if total_user_comments_count >= settings.COMMENT_LIMIT:
+        raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
 
-        # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
-        cutoff_date_lecturer = datetime.datetime(
-            now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
-            (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
-            1,
+    # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
+    cutoff_date_lecturer = datetime.datetime(
+        now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
+        (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
+        1,
+    )
+    lecturer_user_comments_count = (
+        LecturerUserComment.query(session=db.session)
+        .filter(
+            LecturerUserComment.user_id == user.get("id"),
+            LecturerUserComment.lecturer_id == lecturer_id,
+            LecturerUserComment.update_ts >= cutoff_date_lecturer,
         )
-        lecturer_comments_count = (
-            LecturerUserComment.query(session=db.session)
-            .filter(
-                LecturerUserComment.user_id == user.get("id"),
-                LecturerUserComment.lecturer_id == lecturer_id,
-                LecturerUserComment.update_ts >= cutoff_date_lecturer,
-            )
-            .count()
+        .count()
+    )
+    if lecturer_user_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
+        raise TooManyCommentsToLecturer(
+            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
         )
-        if lecturer_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
-            raise TooManyCommentsToLecturer(
-                settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
-            )
+
+    if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
+        raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
+
+    if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
+        raise ForbiddenSymbol()
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
     # в LecturerUserComment, чтобы нельзя было слишком быстро добавлять комментарии
@@ -136,7 +150,7 @@ async def import_comments(
     for comment_info in comments_info.comments:
         new_comment = Comment.create(
             session=db.session,
-            **comment_info.model_dump(exclude={"is_anonymous"}),
+            **comment_info.model_dump(),
             review_status=ReviewStatus.APPROVED,
         )
         result.comments.append(new_comment)
@@ -156,7 +170,7 @@ async def get_comment(uuid: UUID) -> CommentGet:
     return CommentGet.model_validate(comment)
 
 
-@comment.get("", response_model=CommentGetAll)
+@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithStatus])
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -164,7 +178,7 @@ async def get_comments(
     user_id: int | None = None,
     order_by: list[Literal["create_ts"]] = Query(default=[]),
     unreviewed: bool = False,
-    user=Depends(UnionAuth(scopes=['rating.comment.review'], auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
 ) -> CommentGetAll:
     """
     Scopes: `["rating.comment.review"]`
@@ -202,7 +216,13 @@ async def get_comments(
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
-        if "rating.comment.review" not in [scope['name'] for scope in user.get('session_scopes')]:
+        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+            result.comments = [
+                comment
+                for comment in result.comments
+                if comment.review_status is ReviewStatus.PENDING or ReviewStatus.DISMISSED
+            ]
+        else:
             raise ForbiddenAction(Comment)
         comments_query = comments_query.where(Comment.review_status == ReviewStatus.PENDING)
     else:
@@ -232,7 +252,7 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
@@ -252,6 +272,42 @@ async def review_comment(
         raise ObjectNotFound(Comment, uuid)
 
     return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
+
+
+@comment.patch("/{uuid}", response_model=CommentGet)
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+    """Позволяет изменить свой неанонимный комментарий"""
+    comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
+
+    if comment.user_id != user.get("id") or comment.user_id is None:
+        raise ForbiddenAction(Comment)
+
+    # Получаем только переданные для обновления поля
+    update_data = comment_update.model_dump(exclude_unset=True)
+
+    # Если не передано ни одного параметра
+    if not update_data:
+        raise UpdateError(msg="Provide any parametr.")
+        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
+
+    # Проверяем, есть ли неизмененные поля
+    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
+    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
+
+    if unchanged_fields:
+        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
+
+    # Обновление комментария
+    updated_comment = Comment.update(
+        session=db.session,
+        id=uuid,
+        **update_data,
+        update_ts=datetime.datetime.utcnow(),
+        review_status=ReviewStatus.PENDING,
+    )
+
+    return CommentGet.model_validate(updated_comment)
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
