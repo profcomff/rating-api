@@ -235,8 +235,8 @@ async def get_comments(
 @comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
-    _=Depends(UnionAuth(scopes=["rating.comment.review"], allow_none=False, auto_error=True)),
 ) -> CommentGet:
     """
     Scopes: `["rating.comment.review"]`
@@ -251,7 +251,9 @@ async def review_comment(
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
-    return CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
+    return CommentGet.model_validate(
+        Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
+    )
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)

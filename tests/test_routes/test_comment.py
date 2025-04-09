@@ -172,7 +172,7 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
-        ),
+        )
     ],
 )
 def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
@@ -243,7 +243,7 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
 
 
 @pytest.mark.parametrize(
-    'review_status, response_status,is_reviewed',
+    'review_status, response_status, is_reviewed',
     [
         ("approved", status.HTTP_200_OK, True),
         ("approved", status.HTTP_200_OK, False),
