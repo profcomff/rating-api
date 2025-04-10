@@ -22,6 +22,30 @@ def client(mocker):
     client = TestClient(app)
     return client
 
+@pytest.fixture
+def client_admin(mocker):
+    admin_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
+    admin_mock.return_value = {
+        "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
+        "user_scopes": [
+            {"id": 0, "name": "rental.item.create", "comment": "string"},
+            {"id": 1, "name": "rental.item.delete", "comment": "string"},
+            {"id": 2, "name": "rental.item_type.create", "comment": "string"},
+            {"id": 3, "name": "rental.item_type.update", "comment": "string"},
+            {"id": 4, "name": "rental.item_type.delete", "comment": "string"},
+            {"id": 5, "name": "rental.session.admin", "comment": "string"},
+            {"id": 6, "name": "rental.strike.create", "comment": "string"},
+            {"id": 7, "name": "rental.strike.read", "comment": "string"},
+            {"id": 8, "name": "rental.strike.delete", "comment": "string"},
+            {"id": 9, "name": "rental.event.view", "comment": "string"},
+        ],
+        "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
+        "groups": [{"id": 0, "name": "string", "parent_id": 0}],
+        "id": 1,
+        "email": "admin@example.com",
+    }
+    client = TestClient(app)
+    return client
 
 @pytest.fixture
 def dbsession() -> Session:
