@@ -22,9 +22,8 @@ from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
     CommentGetAll,
-    CommentGetAllWithStatus,
+    CommentGetAllWithAllInfo,
     CommentGetWithAllInfo,
-    CommentGetWithStatus,
     CommentImportAll,
     CommentPost,
     CommentUpdate,
@@ -166,7 +165,7 @@ async def get_comment(uuid: UUID) -> CommentGet:
     return CommentGet.model_validate(comment)
 
 
-@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithStatus])
+@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo])
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -197,8 +196,8 @@ async def get_comments(
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
-        result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
-        comment_validator = CommentGetWithStatus
+        result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
+        comment_validator = CommentGetWithAllInfo
     else:
         result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGet
@@ -233,7 +232,7 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}/review", response_model=Union[CommentGetAll, CommentGetWithAllInfo])
+@comment.patch("/{uuid}/review", response_model=CommentGet)
 async def review_comment(
     uuid: UUID,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)),
@@ -252,14 +251,9 @@ async def review_comment(
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
-    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-        result = CommentGetWithAllInfo.model_validate(
-            Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
-        )
-    else:
-        result = CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
-
-    return result
+    return CommentGet.model_validate(
+        Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
+    )
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)

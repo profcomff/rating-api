@@ -109,7 +109,7 @@ class Comment(BaseDbModel):
     mark_kindness: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_freebie: Mapped[int] = mapped_column(Integer, nullable=False)
     mark_clarity: Mapped[int] = mapped_column(Integer, nullable=False)
-    approved_by: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved_by: Mapped[int] = mapped_column(Integer, nullable=True)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
     lecturer: Mapped[Lecturer] = relationship(
         "Lecturer",

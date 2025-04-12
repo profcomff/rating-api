@@ -50,7 +50,7 @@ class CommentGetWithAllInfo(Base):
     mark_general: float
     lecturer_id: int
     review_status: ReviewStatus
-    approved_by: int
+    approved_by: int | None = None
 
 
 class CommentPost(Base):
@@ -117,6 +117,13 @@ class CommentGetAll(Base):
 
 class CommentGetAllWithStatus(Base):
     comments: list[CommentGetWithStatus] = []
+    limit: int
+    offset: int
+    total: int
+
+
+class CommentGetAllWithAllInfo(Base):
+    comments: list[CommentGetWithAllInfo] = []
     limit: int
     offset: int
     total: int
