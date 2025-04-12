@@ -24,6 +24,8 @@ from rating_api.schemas.models import (
     CommentGetAll,
     CommentGetAllWithAllInfo,
     CommentGetWithAllInfo,
+    CommentGetWithStatus,
+    CommentGetAllWithStatus,
     CommentImportAll,
     CommentPost,
     CommentUpdate,
@@ -165,7 +167,7 @@ async def get_comment(uuid: UUID) -> CommentGet:
     return CommentGet.model_validate(comment)
 
 
-@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo])
+@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -195,9 +197,12 @@ async def get_comments(
     comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')] or user.get('id') == user_id:
+    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
         result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithAllInfo
+    elif user.get('id') == user_id:
+        result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
+        comment_validator = CommentGetWithStatus
     else:
         result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGet
