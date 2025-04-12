@@ -23,6 +23,7 @@ from rating_api.schemas.models import (
     CommentGet,
     CommentGetAll,
     CommentGetAllWithStatus,
+    CommentGetWithAllInfo,
     CommentGetWithStatus,
     CommentImportAll,
     CommentPost,
@@ -232,10 +233,10 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}/review", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=Union[CommentGetAll, CommentGetWithAllInfo])
 async def review_comment(
     uuid: UUID,
-    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)),
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
 ) -> CommentGet:
     """
@@ -251,9 +252,14 @@ async def review_comment(
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
-    return CommentGet.model_validate(
-        Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
-    )
+    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+        result = CommentGetWithAllInfo.model_validate(
+            Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
+        )
+    else:
+        result = CommentGet.model_validate(Comment.update(session=db.session, id=uuid, review_status=review_status))
+
+    return result
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)

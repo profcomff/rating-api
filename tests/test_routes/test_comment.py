@@ -172,7 +172,7 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
-        )
+        ),
     ],
 )
 def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):

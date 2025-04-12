@@ -20,10 +20,24 @@ class CommentGet(Base):
     mark_clarity: int
     mark_general: float
     lecturer_id: int
-    approved_by: int
 
 
 class CommentGetWithStatus(Base):
+    uuid: UUID
+    user_id: int | None = None
+    create_ts: datetime.datetime
+    update_ts: datetime.datetime
+    subject: str | None = None
+    text: str
+    mark_kindness: int
+    mark_freebie: int
+    mark_clarity: int
+    mark_general: float
+    lecturer_id: int
+    review_status: ReviewStatus
+
+
+class CommentGetWithAllInfo(Base):
     uuid: UUID
     user_id: int | None = None
     create_ts: datetime.datetime
