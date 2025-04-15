@@ -86,7 +86,7 @@ jobs:
             --env DB_DSN='${{ secrets.DB_DSN }}' \
             --env ROOT_PATH='/rating' \
             --env AUTH_URL='https://api.test.profcomff.com/auth' \
-            --env APP_VERSION='test' \
+            --env APP_ENV='test' \
             --env GUNICORN_CMD_ARGS='--log-config logging_test.conf' \
             --name ${{ env.CONTAINER_NAME }} \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:test
@@ -129,7 +129,7 @@ jobs:
             --env DB_DSN='${{ secrets.DB_DSN }}' \
             --env ROOT_PATH='/rating' \
             --env AUTH_URL='https://api.profcomff.com/auth' \
-            --env APP_VERSION='prod' \
+            --env APP_ENV='prod' \
             --env GUNICORN_CMD_ARGS='--log-config logging_prod.conf' \
             --name ${{ env.CONTAINER_NAME }} \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
