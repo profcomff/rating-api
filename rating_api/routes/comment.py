@@ -173,31 +173,33 @@ async def get_comments(
     offset: int = 0,
     lecturer_id: int | None = None,
     user_id: int | None = None,
-    order_by: list[Literal["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"]] = Query(default=[]),
+    order_by: list[Literal["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"]] = Query(
+        default=[]
+    ),
     unreviewed: bool = False,
     asc_order: bool = False,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
 ) -> CommentGetAll:
     """
-    Scopes: `["rating.comment.review"]`
+     Scopes: `["rating.comment.review"]`
 
-    `limit` - максимальное количество возвращаемых комментариев
+     `limit` - максимальное количество возвращаемых комментариев
 
-    `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
-    Если без смещения возвращается комментарий с условным номером N,
-    то при значении offset = X будет возвращаться комментарий с номером N + X
+     `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
+     Если без смещения возвращается комментарий с условным номером N,
+     то при значении offset = X будет возвращаться комментарий с номером N + X
 
-   `order_by` - возможные значения `"create_ts", "mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
-    Если передано `'create_ts'` - возвращается список преподавателей отсортированных по времени
-    Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
+    `order_by` - возможные значения `"create_ts", "mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
+     Если передано `'create_ts'` - возвращается список преподавателей отсортированных по времени
+     Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
 
-    `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
+     `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
 
-    `user_id` - вернет все комментарии пользователя с конкретным id
+     `user_id` - вернет все комментарии пользователя с конкретным id
 
-    `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
+     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
 
-    `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
+     `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
     comments = Comment.query(session=db.session).all()
     if not comments:
@@ -243,10 +245,10 @@ async def get_comments(
 
     if "mark_freebie" in order_by:
         result.comments.sort(key=lambda comment: comment.mark_freebie, reverse=asc_order)
-    
+
     if "mark_clarity" in order_by:
         result.comments.sort(key=lambda comment: comment.mark_clarity, reverse=asc_order)
-    
+
     if "mark_general" in order_by:
         result.comments.sort(key=lambda comment: comment.mark_general, reverse=asc_order)
 
