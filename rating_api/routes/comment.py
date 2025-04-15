@@ -233,12 +233,12 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}/review", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGetWithAllInfo)
 async def review_comment(
     uuid: UUID,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)),
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
-) -> CommentGet:
+) -> CommentGetWithAllInfo:
     """
     Scopes: `["rating.comment.review"]`
     Проверка комментария и присваивания ему статуса по его UUID в базе данных RatingAPI
@@ -252,7 +252,7 @@ async def review_comment(
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
-    return CommentGet.model_validate(
+    return CommentGetWithAllInfo.model_validate(
         Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
     )
 
