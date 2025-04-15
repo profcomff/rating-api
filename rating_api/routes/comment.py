@@ -217,11 +217,7 @@ async def get_comments(
         if not user:
             raise ForbiddenAction(Comment)
         if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-            result.comments = [
-                comment
-                for comment in result.comments
-                if comment.review_status is ReviewStatus.PENDING or ReviewStatus.DISMISSED
-            ]
+            result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
         else:
             raise ForbiddenAction(Comment)
     else:
