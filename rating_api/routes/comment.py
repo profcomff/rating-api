@@ -313,4 +313,4 @@ async def delete_comment(
 
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
-    ) 
+    )
