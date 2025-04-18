@@ -3,7 +3,7 @@ from functools import lru_cache
 
 from pydantic import ConfigDict, PostgresDsn
 from pydantic_settings import BaseSettings
-
+ 
 
 LOGGING_MARKETING_URLS = {
     "dev": f"http://localhost:{os.getenv('MARKETING_PORT', 8000)}/v1/action",
