@@ -173,8 +173,9 @@ async def get_comments(
     offset: int = 0,
     lecturer_id: int | None = None,
     user_id: int | None = None,
-    order_by: list[Literal["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"]] = Query(
-        default=[]
+    order_by: str = Query(
+        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
+        default=None,
     ),
     unreviewed: bool = False,
     asc_order: bool = False,
@@ -189,9 +190,9 @@ async def get_comments(
      Если без смещения возвращается комментарий с условным номером N,
      то при значении offset = X будет возвращаться комментарий с номером N + X
 
-    `order_by` - возможные значения `"create_ts", "mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
-     Если передано `'create_ts'` - возвращается список преподавателей отсортированных по времени
-     Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
+    `order_by` - возможные значения `"create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
+     Если передано `'create_ts'` - возвращается список комментариев отсортированных по времени
+     Если передано `'mark_...'` - возвращается список комментариев отсортированных по конкретной оценке
 
      `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
 
@@ -201,7 +202,18 @@ async def get_comments(
 
      `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
-    comments = Comment.query(session=db.session).all()
+    comment_query = (
+        Comment.query(session=db.session)
+        .filter(Comment.search_by_lectorer_id(lecturer_id))
+        .filter(Comment.search_by_user_id(user_id))
+        .order_by(*(Comment.order_by_mark(order_by, asc_order)
+            if "mark" in order_by
+            else Comment.order_by_create_ts(order_by, asc_order)
+            )
+        )
+    )
+    comments = comment_query.offset(offset).limit(limit).all()
+
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
@@ -213,13 +225,6 @@ async def get_comments(
     else:
         result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGet
-
-    result.comments = comments
-    if user_id is not None:
-        result.comments = [comment for comment in result.comments if comment.user_id == user_id]
-
-    if lecturer_id is not None:
-        result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
 
     if unreviewed:
         if not user:
@@ -236,21 +241,6 @@ async def get_comments(
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
 
     result.comments = result.comments[offset : limit + offset]
-
-    if "create_ts" in order_by:
-        result.comments.sort(key=lambda comment: comment.create_ts, reverse=asc_order)
-
-    if "mark_kindness" in order_by:
-        result.comments.sort(key=lambda comment: comment.mark_kindness, reverse=asc_order)
-
-    if "mark_freebie" in order_by:
-        result.comments.sort(key=lambda comment: comment.mark_freebie, reverse=asc_order)
-
-    if "mark_clarity" in order_by:
-        result.comments.sort(key=lambda comment: comment.mark_clarity, reverse=asc_order)
-
-    if "mark_general" in order_by:
-        result.comments.sort(key=lambda comment: comment.mark_general, reverse=asc_order)
 
     result.total = len(result.comments)
     result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
