@@ -8,7 +8,7 @@ from enum import Enum
 from fastapi_sqlalchemy import db
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
+from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, desc, func, nulls_last, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -126,31 +126,29 @@ class Comment(BaseDbModel):
     @hybrid_method
     def order_by_create_ts(
         self, query: str, asc_order: bool
-    ) -> tuple[UnaryExpression[datetime.datetime] | InstrumentedAttribute]:
-        return (getattr(Comment, query) if asc_order else getattr(Comment, query).desc), Comment.user_id
-    
+    ) -> tuple[UnaryExpression[datetime.datetime] | InstrumentedAttribute, InstrumentedAttribute]:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query)), Comment.user_id
+
     @hybrid_method
     def order_by_mark(
         self, query: str, asc_order: bool
-    ) -> tuple[UnaryExpression[float], InstrumentedAttribute, InstrumentedAttribute]:
-        expression = func(getattr(Comment, query)).filter(Comment.review_status == ReviewStatus.APPROVED)
-        if not asc_order:
-            expression = expression.desc()
-        return nulls_last(expression), Comment.user_id
-    
+    ) -> tuple[UnaryExpression[float] | InstrumentedAttribute, InstrumentedAttribute]:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query)), Comment.user_id
+
     @hybrid_method
     def search_by_lectorer_id(self, query: int) -> bool:
         response = true
         if query:
             response = and_(Comment.review_status == ReviewStatus.APPROVED, func(Comment.lecturer_id).contains(query))
         return response
-    
+
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
         response = true
         if query:
             response = func(Comment.user_id).contains(query)
         return response
+
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

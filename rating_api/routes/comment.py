@@ -175,7 +175,7 @@ async def get_comments(
     user_id: int | None = None,
     order_by: str = Query(
         enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
-        default=None,
+        default="create_ts",
     ),
     unreviewed: bool = False,
     asc_order: bool = False,
@@ -206,12 +206,15 @@ async def get_comments(
         Comment.query(session=db.session)
         .filter(Comment.search_by_lectorer_id(lecturer_id))
         .filter(Comment.search_by_user_id(user_id))
-        .order_by(*(Comment.order_by_mark(order_by, asc_order)
-            if "mark" in order_by
-            else Comment.order_by_create_ts(order_by, asc_order)
+        .order_by(
+            *(
+                Comment.order_by_create_ts(order_by, asc_order)
+                if "mark" in order_by
+                else Comment.order_by_mark(order_by, asc_order)
             )
         )
     )
+
     comments = comment_query.offset(offset).limit(limit).all()
 
     if not comments:
