@@ -304,7 +304,7 @@ async def delete_comment(
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
     # Наличие скоупа для удаления любых комментариев
-    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes', [])]
+    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes')]
 
     # Если нет привилегии - проверяем права обычного пользователя
     if not has_delete_scope and (comment.is_anonymous or comment.user_id != user.get('id')):
