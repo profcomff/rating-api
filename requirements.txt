@@ -10,3 +10,5 @@ pydantic
 pydantic-settings
 SQLAlchemy
 uvicorn
+logger_middleware
+
