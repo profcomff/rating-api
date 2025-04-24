@@ -15,7 +15,7 @@ LOGGING_MARKETING_URLS = {
 class Settings(BaseSettings):
     """Application settings"""
 
-    DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
+    DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:54322/postgres'
     ROOT_PATH: str = '/' + os.getenv("APP_NAME", "")
     COMMENT_FREQUENCY_IN_MONTH: int = 10
     COMMENT_LECTURER_FREQUENCE_IN_MONTH: int = 6
