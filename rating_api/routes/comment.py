@@ -205,7 +205,7 @@ async def get_comments(
 
         comments = query.all()
         if not comments:
-            return CommentGetAll(polls=[], limit=limit, offset=offset, total=0)
+            raise ObjectNotFound(Comment, 'all')
 
         paginated = comments[offset : offset + limit]
         paginated.sort(key=lambda c: c.create_ts, reverse=True)
