@@ -166,6 +166,7 @@ async def get_comment(uuid: UUID) -> CommentGet:
         raise ObjectNotFound(Comment, uuid)
     return CommentGet.model_validate(comment)
 
+
 @comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
 async def get_comments(
     limit: int = 10,
@@ -199,24 +200,23 @@ async def get_comments(
         query = Comment.query(session=db.session)
         # пусто или нет
         query = query.filter(
-            Comment.review_status == ReviewStatus.PENDING,)
-        
+            Comment.review_status == ReviewStatus.PENDING,
+        )
+
         comments = query.all()
         if not comments:
             return CommentGetAll(polls=[], limit=limit, offset=offset, total=0)
-        
-        paginated = comments[offset:offset+limit]
-        paginated.sort(key = lambda c: c.create_ts, reverse=True)
 
-        return CommentGetAll(
-            comments=paginated,limit=limit,offset=offset, total=len(comments)
-        )
-    
-    else:    
+        paginated = comments[offset : offset + limit]
+        paginated.sort(key=lambda c: c.create_ts, reverse=True)
+
+        return CommentGetAll(comments=paginated, limit=limit, offset=offset, total=len(comments))
+
+    else:
         comments = Comment.query(session=db.session).all()
         if not comments:
             raise ObjectNotFound(Comment, 'all')
-        
+
         if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
             result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
             comment_validator = CommentGetWithAllInfo
@@ -237,7 +237,9 @@ async def get_comments(
             if not user:
                 raise ForbiddenAction(Comment)
             if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-                result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
+                result.comments = [
+                    comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING
+                ]
             else:
                 raise ForbiddenAction(Comment)
         else:
@@ -251,6 +253,7 @@ async def get_comments(
         result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
         result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
         return result
+
 
 @comment.patch("/{uuid}/review", response_model=CommentGetWithAllInfo)
 async def review_comment(

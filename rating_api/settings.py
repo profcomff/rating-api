@@ -15,7 +15,7 @@ LOGGING_MARKETING_URLS = {
 class Settings(BaseSettings):
     """Application settings"""
 
-    DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:54322/postgres'
+    DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
     ROOT_PATH: str = '/' + os.getenv("APP_NAME", "")
     COMMENT_FREQUENCY_IN_MONTH: int = 10
     COMMENT_LECTURER_FREQUENCE_IN_MONTH: int = 6
@@ -27,9 +27,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: list[str] = ['*']
     CORS_ALLOW_HEADERS: list[str] = ['*']
     MAX_COMMENT_LENGTH: int = 3000
-    LOGGING_MARKETING_URL: str = LOGGING_MARKETING_URLS.get(
-        os.getenv("APP_ENV", "dev"), LOGGING_MARKETING_URLS["test"]
-    )
+    LOGGING_MARKETING_URL: str = LOGGING_MARKETING_URLS.get(os.getenv("APP_ENV", "dev"), LOGGING_MARKETING_URLS["test"])
 
     '''Temp settings'''
 
