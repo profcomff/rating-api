@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: list[str] = ['*']
     MAX_COMMENT_LENGTH: int = 3000
 
-
     '''Temp settings'''
 
     API_URL: str = "https://api.test.profcomff.com/"
