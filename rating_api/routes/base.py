@@ -37,4 +37,5 @@ app.add_middleware(
 app.include_router(lecturer)
 app.include_router(comment)
 
-app.add_middleware(LoggerMiddleware, service_id=settings.SERVICE_ID)
+if __version__ != 'dev':
+    app.add_middleware(LoggerMiddleware, service_id=settings.SERVICE_ID)
