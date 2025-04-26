@@ -197,7 +197,7 @@ async def get_comments(
     comments = Comment.query(session=db.session).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+    if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
         result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithAllInfo
     elif user.get('id') == user_id:
