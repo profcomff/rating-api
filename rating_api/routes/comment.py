@@ -200,7 +200,7 @@ async def get_comments(
     if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
         result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithAllInfo
-    elif user.get('id') == user_id:
+    elif user and user.get('id') == user_id:
         result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithStatus
     else:
