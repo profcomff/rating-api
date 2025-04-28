@@ -46,11 +46,14 @@ def lecturer(dbsession):
 @pytest.fixture
 def comment(dbsession, lecturer):
     _comment = Comment(
+        user_id=0,
+        create_ts="2025-04-25T19:38:56.408Z",
         subject="test_subject",
         text="test_comment",
         mark_kindness=1,
         mark_clarity=1,
         mark_freebie=1,
+        mark_general=1,
         lecturer_id=lecturer.id,
         review_status=ReviewStatus.APPROVED,
     )

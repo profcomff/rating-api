@@ -198,6 +198,7 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
 
 def test_get_comment(client, comment):
     response_comment = client.get(f'{url}/{comment.uuid}')
+    print("1")
     assert response_comment.status_code == status.HTTP_200_OK
     random_uuid = uuid.uuid4()
     response = client.get(f'{url}/{random_uuid}')

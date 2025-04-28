@@ -179,7 +179,7 @@ async def get_comments(
     ),
     unreviewed: bool = False,
     asc_order: bool = False,
-    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)),
 ) -> CommentGetAll:
     """
      Scopes: `["rating.comment.review"]`
@@ -202,7 +202,7 @@ async def get_comments(
 
      `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
-    comment_query = (
+    comments = (
         Comment.query(session=db.session)
         .filter(Comment.search_by_lectorer_id(lecturer_id))
         .filter(Comment.search_by_user_id(user_id))
@@ -213,9 +213,10 @@ async def get_comments(
                 else Comment.order_by_mark(order_by, asc_order)
             )
         )
+        .limit(limit)
+        .offset(offset)
+        .all()
     )
-
-    comments = comment_query.offset(offset).limit(limit).all()
 
     if not comments:
         raise ObjectNotFound(Comment, 'all')
@@ -242,7 +243,6 @@ async def get_comments(
             raise ForbiddenAction(Comment)
     else:
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
-
     result.comments = result.comments[offset : limit + offset]
 
     result.total = len(result.comments)

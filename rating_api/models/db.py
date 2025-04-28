@@ -139,7 +139,7 @@ class Comment(BaseDbModel):
     def search_by_lectorer_id(self, query: int) -> bool:
         response = true
         if query:
-            response = and_(Comment.review_status == ReviewStatus.APPROVED, func(Comment.lecturer_id).contains(query))
+            response = and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
         return response
 
     @hybrid_method
