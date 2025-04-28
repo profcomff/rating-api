@@ -146,7 +146,7 @@ class Comment(BaseDbModel):
     def search_by_user_id(self, query: int) -> bool:
         response = true
         if query:
-            response = func(Comment.user_id).contains(query)
+            response = and_(Comment.user_id == query)
         return response
 
 
