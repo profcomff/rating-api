@@ -62,18 +62,27 @@ class BaseDbModel(Base):
     def update(cls, id: int | str, *, session: Session, check_empty: list[str] = None, **kwargs) -> BaseDbModel:
         obj = cls.get(id, session=session)
 
-        if not kwargs:
-            raise UpdateError(msg="Provide any parametr.") # 409
-            # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No fields provided for update.")
+        # Технические поля не проверяются при update комментария
+        technical_fields = {'update_ts', 'review_status'}
 
-        unchanged_fields = []
+        # for field in kwargs.items():
+        #     if field in technical_fields:
+        #         continue
+
+        #     raise UpdateError(msg="Provide any parametr.") # 409
+        #         # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No fields provided for update.")
+
+        # Проверка на изменение полей
+        changed_fields = False
         for field, new_value in kwargs.items():
-            old_value = getattr(obj, field)
-            if old_value == new_value:
-                unchanged_fields.append(field)
         
-        if unchanged_fields:
-            raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+            old_value = getattr(obj, field)
+            if old_value != new_value and not field in technical_fields:
+                changed_fields = True
+                break
+        
+        if not changed_fields:
+            raise UpdateError(msg=f"No changes detected in fields")
             # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"No changes detected in fields")
 
         for k, v in kwargs.items():
