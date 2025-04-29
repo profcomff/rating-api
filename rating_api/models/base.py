@@ -65,13 +65,6 @@ class BaseDbModel(Base):
         # Технические поля не проверяются при update комментария
         technical_fields = {'update_ts', 'review_status'}
 
-        # for field in kwargs.items():
-        #     if field in technical_fields:
-        #         continue
-
-        #     raise UpdateError(msg="Provide any parametr.") # 409
-        #         # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No fields provided for update.")
-
         # Проверка на изменение полей
         changed_fields = False
         for field, new_value in kwargs.items():
