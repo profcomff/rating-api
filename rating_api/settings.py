@@ -27,9 +27,7 @@ class Settings(BaseSettings):
     CORS_ALLOW_METHODS: list[str] = ['*']
     CORS_ALLOW_HEADERS: list[str] = ['*']
     MAX_COMMENT_LENGTH: int = 3000
-    LOGGING_MARKETING_URL: str = LOGGING_MARKETING_URLS.get(
-        os.getenv("APP_ENV", "dev"), LOGGING_MARKETING_URLS["test"]
-    )
+    LOGGING_MARKETING_URL: str = LOGGING_MARKETING_URLS.get(os.getenv("APP_ENV", "dev"), LOGGING_MARKETING_URLS["test"])
 
     '''Temp settings'''
 

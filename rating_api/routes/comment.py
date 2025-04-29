@@ -256,12 +256,9 @@ async def review_comment(
         Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
     )
 
+
 @comment.patch("/{uuid}", response_model=CommentGet)
-async def update_comment(
-    uuid: UUID,
-    comment_update: CommentUpdate,
-    user=Depends(UnionAuth())
-) -> CommentGet:
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
     """Позволяет изменить свой неанонимный комментарий"""
     comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
 
@@ -282,6 +279,7 @@ async def update_comment(
     )
 
     return CommentGet.model_validate(updated_comment)
+
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
