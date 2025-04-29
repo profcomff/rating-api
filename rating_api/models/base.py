@@ -59,7 +59,7 @@ class BaseDbModel(Base):
             raise ObjectNotFound(cls, id)
 
     @classmethod
-    def update(cls, id: int | str, *, session: Session, check_empty: list[str] = None, **kwargs) -> BaseDbModel:
+    def update(cls, id: int | str, *, session: Session, **kwargs) -> BaseDbModel:
         obj = cls.get(id, session=session)
 
         # Технические поля не проверяются при update комментария

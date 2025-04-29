@@ -268,11 +268,10 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     # Получаем только переданные для обновления поля
     update_data = comment_update.model_dump(exclude_unset=True)
 
-    # Обновляем комментарий (проверки уже в базовом update())
+    # Обновляем комментарий
     updated_comment = Comment.update(
         session=db.session,
         id=uuid,
-        check_empty=["text"],  # Запрещаем обновлять `text` на пустую строку
         **update_data,
         update_ts=datetime.datetime.utcnow(),
         review_status=ReviewStatus.PENDING,
