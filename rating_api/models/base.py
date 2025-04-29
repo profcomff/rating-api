@@ -6,7 +6,7 @@ from sqlalchemy import not_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
 
-from rating_api.exceptions import ObjectNotFound
+from rating_api.exceptions import ObjectNotFound, UpdateError
 
 
 @as_declarative()
@@ -59,10 +59,26 @@ class BaseDbModel(Base):
             raise ObjectNotFound(cls, id)
 
     @classmethod
-    def update(cls, id: int | str, *, session: Session, **kwargs) -> BaseDbModel:
+    def update(cls, id: int | str, *, session: Session, check_empty: list[str] = None, **kwargs) -> BaseDbModel:
         obj = cls.get(id, session=session)
+
+        if not kwargs:
+            raise UpdateError(msg="Provide any parametr.") # 409
+            # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No fields provided for update.")
+
+        unchanged_fields = []
+        for field, new_value in kwargs.items():
+            old_value = getattr(obj, field)
+            if old_value == new_value:
+                unchanged_fields.append(field)
+        
+        if unchanged_fields:
+            raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
+            # raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"No changes detected in fields")
+
         for k, v in kwargs.items():
             setattr(obj, k, v)
+
         session.flush()
         return obj
 
