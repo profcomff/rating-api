@@ -25,13 +25,11 @@ class Settings(BaseSettings):
     # Environment setting
     APP_ENV: str = os.getenv("APP_ENV", "dev")  # Can be "dev", "test", or "prod"
 
-    # Achievement API settings for different environments
     PROD_API_URL: str = "https://api.profcomff.com/"
     TEST_API_URL: str = "https://api.test.profcomff.com/"
     ACHIEVEMENT_GIVE_TOKEN: str = os.getenv("ACHIEVEMENT_API", "")
 
     '''Temp settings'''
-    # For backwards compatibility
     API_URL: str = "https://api.test.profcomff.com/"
     FIRST_COMMENT_ACHIEVEMENT_ID_TEST: int = 48
     FIRST_COMMENT_ACHIEVEMENT_ID_PROD: int = 12
