@@ -5,7 +5,7 @@ from uuid import UUID
 
 import aiohttp
 from auth_lib.fastapi import UnionAuth
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
 
 from rating_api.exceptions import (
@@ -31,7 +31,6 @@ from rating_api.schemas.models import (
     CommentUpdate,
 )
 from rating_api.settings import Settings, get_settings
-from rating_api.utils.achievements import award_first_comment_achievement
 
 
 settings: Settings = get_settings()
@@ -39,9 +38,7 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(
-    lecturer_id: int, comment_info: CommentPost, background_tasks: BackgroundTasks, user=Depends(UnionAuth())
-) -> CommentGet:
+async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
@@ -113,8 +110,29 @@ async def create_comment(
         user_id=user_id,
         review_status=ReviewStatus.PENDING,
     )
-    # give achievement for first comment
-    background_tasks.add_task(award_first_comment_achievement, user.get('id'))
+
+    # Выдача аччивки юзеру за первый комментарий
+    async with aiohttp.ClientSession() as session:
+        give_achievement = True
+        async with session.get(
+            settings.API_URL + f"achievement/user/{user.get('id'):}",
+            headers={"Accept": "application/json"},
+        ) as response:
+            if response.status == 200:
+                user_achievements = await response.json()
+                for achievement in user_achievements.get("achievement", []):
+                    if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                        give_achievement = False
+                        break
+            else:
+                give_achievement = False
+        if give_achievement:
+            session.post(
+                settings.API_URL
+                + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
+                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
+            )
+
     return CommentGet.model_validate(new_comment)
 
 
