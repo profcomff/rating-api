@@ -254,13 +254,13 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
     ],
 )
 def test_review_comment(client, dbsession, unreviewed_comment, comment, review_status, response_status, is_reviewed):
-    commment_to_reivew = comment if is_reviewed else unreviewed_comment
+    commment_to_review = comment if is_reviewed else unreviewed_comment
     query = {"review_status": review_status}
-    response = client.patch(f"{url}/{commment_to_reivew.uuid}/review", params=query)
+    response = client.patch(f"{url}/{commment_to_review.uuid}/review", params=query)
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
-        dbsession.refresh(commment_to_reivew)
-        assert commment_to_reivew.review_status == ReviewStatus(review_status)
+        dbsession.refresh(commment_to_review)
+        assert commment_to_review.review_status == ReviewStatus(review_status)
 
 
 @pytest.mark.parametrize(
@@ -319,7 +319,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
             },
             status.HTTP_409_CONFLICT,
         ),
-        (  # НЕизмененным перелано одно поле
+        (  # НЕизмененным передано одно поле
             {
                 "subject": "asf",
                 "text": "asf",
@@ -327,7 +327,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
                 "mark_clarity": 2,
                 "mark_freebie": 1,
             },
-            status.HTTP_409_CONFLICT,
+            status.HTTP_200_OK,
         ),
     ],
 )

@@ -268,20 +268,7 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     # Получаем только переданные для обновления поля
     update_data = comment_update.model_dump(exclude_unset=True)
 
-    # Если не передано ни одного параметра
-    if not update_data:
-        raise UpdateError(msg="Provide any parametr.")
-        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
-
-    # Проверяем, есть ли неизмененные поля
-    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
-    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
-
-    if unchanged_fields:
-        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
-        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
-
-    # Обновление комментария
+    # Обновляем комментарий
     updated_comment = Comment.update(
         session=db.session,
         id=uuid,
