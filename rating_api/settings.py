@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: list[str] = ['*']
     MAX_COMMENT_LENGTH: int = 3000
 
-    # Environment setting
     APP_ENV: str = os.getenv("APP_ENV", "dev")  # Can be "dev", "test", or "prod"
 
     PROD_API_URL: str = "https://api.profcomff.com/"
