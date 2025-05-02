@@ -126,28 +126,24 @@ class Comment(BaseDbModel):
     @hybrid_method
     def order_by_create_ts(
         self, query: str, asc_order: bool
-    ) -> tuple[UnaryExpression[datetime.datetime] | InstrumentedAttribute, InstrumentedAttribute]:
-        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query)), Comment.user_id
+    ) -> UnaryExpression[datetime.datetime] | InstrumentedAttribute:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
 
     @hybrid_method
-    def order_by_mark(
-        self, query: str, asc_order: bool
-    ) -> tuple[UnaryExpression[float] | InstrumentedAttribute, InstrumentedAttribute]:
-        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query)), Comment.user_id
+    def order_by_mark(self, query: str, asc_order: bool) -> UnaryExpression[float] | InstrumentedAttribute:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
 
     @hybrid_method
     def search_by_lectorer_id(self, query: int) -> bool:
-        response = true
-        if query:
-            response = and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
-        return response
+        if not query:
+            return true()
+        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
-        response = true
-        if query:
-            response = and_(Comment.user_id == query)
-        return response
+        if not query:
+            return true()
+        return Comment.user_id == query
 
 
 class LecturerUserComment(BaseDbModel):

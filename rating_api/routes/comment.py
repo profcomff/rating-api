@@ -207,19 +207,18 @@ async def get_comments(
         .filter(Comment.search_by_lectorer_id(lecturer_id))
         .filter(Comment.search_by_user_id(user_id))
         .order_by(
-            *(
-                Comment.order_by_create_ts(order_by, asc_order)
-                if "mark" in order_by
-                else Comment.order_by_mark(order_by, asc_order)
-            )
+            Comment.order_by_create_ts(order_by, asc_order)
+            if "mark" in order_by
+            else Comment.order_by_mark(order_by, asc_order)
         )
     )
-    
+
+    print(comments_query.statement.compile())
     comments = comments_query.limit(limit).offset(offset).all()
-        
+
     if not comments:
         raise ObjectNotFound(Comment, 'all')
-    if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
+    if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
         result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithAllInfo
     elif user.get('id') == user_id:
@@ -230,7 +229,7 @@ async def get_comments(
         comment_validator = CommentGet
 
     result.comments = comments
-    
+
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
@@ -244,7 +243,6 @@ async def get_comments(
             raise ForbiddenAction(Comment)
     else:
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
-    result.comments = result.comments[offset : limit + offset]
 
     result.total = len(result.comments)
     result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
