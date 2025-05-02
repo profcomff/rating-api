@@ -207,13 +207,12 @@ async def get_comments(
         .filter(Comment.search_by_lectorer_id(lecturer_id))
         .filter(Comment.search_by_user_id(user_id))
         .order_by(
-            Comment.order_by_create_ts(order_by, asc_order)
+            Comment.order_by_mark(order_by, asc_order)
             if "mark" in order_by
-            else Comment.order_by_mark(order_by, asc_order)
+            else Comment.order_by_create_ts(order_by, asc_order)
         )
     )
 
-    print(comments_query.statement.compile())
     comments = comments_query.limit(limit).offset(offset).all()
 
     if not comments:
