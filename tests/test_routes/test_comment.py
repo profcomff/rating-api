@@ -198,6 +198,7 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
 
 def test_get_comment(client, comment):
     response_comment = client.get(f'{url}/{comment.uuid}')
+    print("1")
     assert response_comment.status_code == status.HTTP_200_OK
     random_uuid = uuid.uuid4()
     response = client.get(f'{url}/{random_uuid}')
@@ -205,7 +206,8 @@ def test_get_comment(client, comment):
 
 
 @pytest.mark.parametrize(
-    'lecturer_n,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (3, status.HTTP_200_OK)]
+    'lecturer_n,response_status',
+    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK), (3, status.HTTP_404_NOT_FOUND)],
 )
 def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, response_status):
     lecturers, comments = lecturers_with_comments
@@ -216,8 +218,10 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
         assert len(json_response["comments"]) == len(
             [
                 comment
-                for comment in lecturers[lecturer_n].comments
-                if comment.review_status == ReviewStatus.APPROVED and not comment.is_deleted
+                for comment in comments
+                if comment.lecturer_id == lecturers[lecturer_n].id
+                and comment.review_status == ReviewStatus.APPROVED
+                and not comment.is_deleted
             ]
         )
 
@@ -227,7 +231,7 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
 )
 def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_status):
     _, comments = lecturers_with_comments
-    response = response = client.get(f'{url}', params={"user_id": user_id})
+    response = client.get(f'{url}', params={"user_id": 9990 + user_id})
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
         json_response = response.json()
@@ -235,7 +239,7 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
             [
                 comment
                 for comment in comments
-                if comment.user_id == user_id
+                if comment.user_id == 9990 + user_id
                 and comment.review_status == ReviewStatus.APPROVED
                 and not comment.is_deleted
             ]

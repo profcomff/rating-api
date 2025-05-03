@@ -173,28 +173,47 @@ async def get_comments(
     offset: int = 0,
     lecturer_id: int | None = None,
     user_id: int | None = None,
-    order_by: list[Literal["create_ts"]] = Query(default=[]),
+    order_by: str = Query(
+        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
+        default="create_ts",
+    ),
     unreviewed: bool = False,
-    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=True)),
+    asc_order: bool = False,
+    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)),
 ) -> CommentGetAll:
     """
-    Scopes: `["rating.comment.review"]`
+     Scopes: `["rating.comment.review"]`
 
-    `limit` - максимальное количество возвращаемых комментариев
+     `limit` - максимальное количество возвращаемых комментариев
 
-    `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
-    Если без смещения возвращается комментарий с условным номером N,
-    то при значении offset = X будет возвращаться комментарий с номером N + X
+     `offset` -  смещение, определяющее, с какого по порядку комментария начинать выборку.
+     Если без смещения возвращается комментарий с условным номером N,
+     то при значении offset = X будет возвращаться комментарий с номером N + X
 
-    `order_by` - возможное значение `'create_ts'` - возвращается список комментариев отсортированных по времени создания
+    `order_by` - возможные значения `"create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
+     Если передано `'create_ts'` - возвращается список комментариев отсортированных по времени
+     Если передано `'mark_...'` - возвращается список комментариев отсортированных по конкретной оценке
 
-    `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
+     `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
 
-    `user_id` - вернет все комментарии пользователя с конкретным id
+     `user_id` - вернет все комментарии пользователя с конкретным id
 
-    `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
+     `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
+
+     `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
-    comments = Comment.query(session=db.session).all()
+    comments_query = (
+        Comment.query(session=db.session)
+        .filter(Comment.search_by_lectorer_id(lecturer_id))
+        .filter(Comment.search_by_user_id(user_id))
+        .order_by(
+            Comment.order_by_mark(order_by, asc_order)
+            if "mark" in order_by
+            else Comment.order_by_create_ts(order_by, asc_order)
+        )
+    )
+
+    comments = comments_query.limit(limit).offset(offset).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
@@ -206,12 +225,8 @@ async def get_comments(
     else:
         result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGet
-    result.comments = comments
-    if user_id is not None:
-        result.comments = [comment for comment in result.comments if comment.user_id == user_id]
 
-    if lecturer_id is not None:
-        result.comments = [comment for comment in result.comments if comment.lecturer_id == lecturer_id]
+    result.comments = comments
 
     if unreviewed:
         if not user:
@@ -223,13 +238,9 @@ async def get_comments(
     else:
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
 
-    result.comments = result.comments[offset : limit + offset]
-
-    if "create_ts" in order_by:
-        result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
     result.total = len(result.comments)
     result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
-    result.comments.sort(key=lambda comment: comment.create_ts, reverse=True)
+
     return result
 
 

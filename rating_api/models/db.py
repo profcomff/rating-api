@@ -8,7 +8,7 @@ from enum import Enum
 from fastapi_sqlalchemy import db
 from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, func, nulls_last, or_, true
+from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, desc, func, nulls_last, or_, true
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -122,6 +122,28 @@ class Comment(BaseDbModel):
     @hybrid_property
     def mark_general(self):
         return (self.mark_kindness + self.mark_freebie + self.mark_clarity) / 3
+
+    @hybrid_method
+    def order_by_create_ts(
+        self, query: str, asc_order: bool
+    ) -> UnaryExpression[datetime.datetime] | InstrumentedAttribute:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
+
+    @hybrid_method
+    def order_by_mark(self, query: str, asc_order: bool) -> UnaryExpression[float] | InstrumentedAttribute:
+        return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
+
+    @hybrid_method
+    def search_by_lectorer_id(self, query: int) -> bool:
+        if not query:
+            return true()
+        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
+
+    @hybrid_method
+    def search_by_user_id(self, query: int) -> bool:
+        if not query:
+            return true()
+        return Comment.user_id == query
 
 
 class LecturerUserComment(BaseDbModel):
