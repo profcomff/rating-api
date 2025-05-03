@@ -137,14 +137,18 @@ class Comment(BaseDbModel):
     def search_by_lectorer_id(self, query: int) -> bool:
         if not query:
             return true()
-        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
+        return Comment.lecturer_id == query
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
         if not query:
             return true()
         return Comment.user_id == query
-
+    @hybrid_method
+    def search_by_subject(self, query: str) -> bool:
+        if not query:
+            return true()
+        return func.lower(Comment.subject).contains(query)
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

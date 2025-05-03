@@ -173,6 +173,7 @@ async def get_comments(
     offset: int = 0,
     lecturer_id: int | None = None,
     user_id: int | None = None,
+    subject: str | None = None,
     order_by: str = Query(
         enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
         default="create_ts",
@@ -206,6 +207,7 @@ async def get_comments(
         Comment.query(session=db.session)
         .filter(Comment.search_by_lectorer_id(lecturer_id))
         .filter(Comment.search_by_user_id(user_id))
+        .filter(Comment.search_by_subject(subject))
         .order_by(
             Comment.order_by_mark(order_by, asc_order)
             if "mark" in order_by
