@@ -149,7 +149,7 @@ class Comment(BaseDbModel):
     def search_by_subject(self, query: str) -> bool:
         if not query:
             return true()
-        return func.lower(Comment.subject).contains(querylower())
+        return func.lower(Comment.subject).contains(query.lower())
 
 
 class LecturerUserComment(BaseDbModel):
