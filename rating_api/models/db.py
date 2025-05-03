@@ -136,13 +136,13 @@ class Comment(BaseDbModel):
     @hybrid_method
     def search_by_lectorer_id(self, query: int) -> bool:
         if not query:
-            return true()
+            return true
         return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
         if not query:
-            return true()
+            return true
         return Comment.user_id == query
 
 
