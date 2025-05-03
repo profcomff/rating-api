@@ -144,6 +144,11 @@ class Comment(BaseDbModel):
         if not query:
             return true
         return Comment.user_id == query
+    @hybrid_method
+    def search_by_subject(self, query: str) -> bool:
+        if not query:
+            return true()
+        return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
 
 
 class LecturerUserComment(BaseDbModel):

@@ -53,7 +53,6 @@ def comment(dbsession, lecturer):
         mark_kindness=1,
         mark_clarity=1,
         mark_freebie=1,
-        mark_general=1,
         lecturer_id=lecturer.id,
         review_status=ReviewStatus.APPROVED,
     )
@@ -169,8 +168,9 @@ def lecturers_with_comments(dbsession, lecturers):
         (lecturers[2].id, 9992, 'test_subject12', ReviewStatus.APPROVED, 0, 0, 0),
     ]
 
-    comments = [
-        Comment(
+    comments = []
+    for lecturer_id, user_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data:
+        comment = Comment(
             subject=subject,
             text="test_comment",
             mark_kindness=mark_kindness,
@@ -180,8 +180,12 @@ def lecturers_with_comments(dbsession, lecturers):
             user_id=user_id,
             review_status=review_status,
         )
-        for lecturer_id, user_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data
-    ]
+
+        # Set approved_by to -1 for approved or dismissed comments
+        if review_status in [ReviewStatus.APPROVED, ReviewStatus.DISMISSED]:
+            comment.approved_by = -1
+
+        comments.append(comment)
 
     dbsession.add_all(comments)
     dbsession.commit()
