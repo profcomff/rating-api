@@ -264,8 +264,8 @@ async def review_comment(
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
     """
-
     check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
