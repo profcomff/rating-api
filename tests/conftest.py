@@ -19,6 +19,12 @@ def client(mocker):
         "id": 0,
         "email": "string",
     }
+    scopes_mock = mocker.patch('auth_lib.fastapi.UnionAuth._get_session')
+    scopes_mock.return_value = {
+        "id": 1,
+        "session_scopes": [{"name": "test_scope"}],
+        "user_scopes": [{"name": "test_scope"}]
+    }
     client = TestClient(app)
     return client
 

@@ -15,7 +15,6 @@ from rating_api.exceptions import (
     ObjectNotFound,
     TooManyCommentRequests,
     TooManyCommentsToLecturer,
-    UpdateError,
 )
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
