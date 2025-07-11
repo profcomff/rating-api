@@ -83,6 +83,7 @@ async def get_lecturers(
         enum=["mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"],
         default="mark_weighted",
     ),
+    mark: float = Query(default=None, ge=-2, le=2),
     subject: str = Query(''),
     name: str = Query(''),
     asc_order: bool = False,
@@ -143,6 +144,10 @@ async def get_lecturers(
                 for comment in db_lecturer.comments
                 if comment.review_status is ReviewStatus.APPROVED
             ]
+            if (mark is not None
+                and approved_comments
+                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) < mark):
+                continue
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = sorted(
                     approved_comments, key=lambda comment: comment.create_ts, reverse=True
