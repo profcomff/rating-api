@@ -234,11 +234,7 @@ async def get_comments(
         if not user:
             raise ForbiddenAction(Comment)
         if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-            result.comments = [
-                comment
-                for comment in result.comments
-                if comment.review_status is ReviewStatus.PENDING or ReviewStatus.DISMISSED
-            ]
+            result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
         else:
             raise ForbiddenAction(Comment)
     else:
@@ -250,12 +246,12 @@ async def get_comments(
     return result
 
 
-@comment.patch("/{uuid}/review", response_model=CommentGet)
+@comment.patch("/{uuid}/review", response_model=CommentGetWithAllInfo)
 async def review_comment(
     uuid: UUID,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)),
     review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
-) -> CommentGet:
+) -> CommentGetWithAllInfo:
     """
     Scopes: `["rating.comment.review"]`
     Проверка комментария и присваивания ему статуса по его UUID в базе данных RatingAPI
@@ -269,7 +265,7 @@ async def review_comment(
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
-    return CommentGet.model_validate(
+    return CommentGetWithAllInfo.model_validate(
         Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
     )
 
@@ -285,20 +281,7 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     # Получаем только переданные для обновления поля
     update_data = comment_update.model_dump(exclude_unset=True)
 
-    # Если не передано ни одного параметра
-    if not update_data:
-        raise UpdateError(msg="Provide any parametr.")
-        # raise HTTPException(status_code=409, detail="Provide any parametr")  # 409
-
-    # Проверяем, есть ли неизмененные поля
-    current_data = {key: getattr(comment, key) for key in update_data}  # Берем текущие значения из БД
-    unchanged_fields = {k for k, v in update_data.items() if current_data.get(k) == v}
-
-    if unchanged_fields:
-        raise UpdateError(msg=f"No changes detected in fields: {', '.join(unchanged_fields)}.")
-        # raise HTTPException(status_code=409, detail=f"No changes detected in fields: {', '.join(unchanged_fields)}")
-
-    # Обновление комментария
+    # Обновляем комментарий
     updated_comment = Comment.update(
         session=db.session,
         id=uuid,
@@ -312,16 +295,23 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
 async def delete_comment(
-    uuid: UUID, _=Depends(UnionAuth(scopes=["rating.comment.delete"], allow_none=False, auto_error=True))
+    uuid: UUID,
+    user=Depends(UnionAuth(auto_error=True, allow_none=False)),
 ):
     """
     Scopes: `["rating.comment.delete"]`
 
     Удаляет комментарий по его UUID в базе данных RatingAPI
     """
-    check_comment = Comment.get(session=db.session, id=uuid)
-    if check_comment is None:
+    comment = Comment.get(uuid, session=db.session)
+    if comment is None:
         raise ObjectNotFound(Comment, uuid)
+    # Наличие скоупа для удаления любых комментариев
+    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes')]
+
+    # Если нет привилегии - проверяем права обычного пользователя
+    if not has_delete_scope and (comment.is_anonymous or comment.user_id != user.get('id')):
+        raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
