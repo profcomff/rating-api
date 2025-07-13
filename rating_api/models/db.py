@@ -152,7 +152,6 @@ class Comment(BaseDbModel):
         return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
 
 
-
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
