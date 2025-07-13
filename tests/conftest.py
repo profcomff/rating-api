@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -46,6 +48,7 @@ def lecturer(dbsession):
 @pytest.fixture
 def comment(dbsession, lecturer):
     _comment = Comment(
+        uuid=uuid.uuid4(),
         user_id=0,
         create_ts="2025-04-25T19:38:56.408Z",
         subject="test_subject",
