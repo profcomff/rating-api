@@ -325,7 +325,18 @@ async def like_comment(
     user=Depends(UnionAuth()),
 ) -> CommentGet:
     """
-    Likes or dislikes a comment by UUID
+    Likes or dislikes a comment by UUID.
+
+    Args:
+        uuid: The UUID of the comment to like/dislike.
+        like: The type of reaction ("1" for like, "-1" for dislike).
+        user: The authenticated user obtained from UnionAuth dependency.
+
+    Returns:
+        CommentGet: The updated comment data.
+
+    Raises:
+        ObjectNotFound: If the comment with given UUID is not found.
     """
     like = int(like)
     comment = Comment.get(session=db.session, id=uuid)

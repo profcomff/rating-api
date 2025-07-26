@@ -358,3 +358,20 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
 #     assert comment.is_deleted
 #     response = client.get(f'{url}/{comment.uuid}')
 #     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_post_like(client, dbsession, comment):
+    response = client.post(f'{url}/{comment.uuid}/like', params={'like': 1})
+    assert response.status_code == status.HTTP_200_OK
+    dbsession.refresh(comment)
+    assert comment.like_count == 1
+    response = client.post(f'{url}/{comment.uuid}/like', params={'like': -1})
+    assert response.status_code == status.HTTP_200_OK
+    dbsession.refresh(comment)
+    assert comment.like_count == 0
+    assert comment.dislike_count == 1
+    response = client.post(f'{url}/{comment.uuid}/like', params={'like': -1})
+    assert response.status_code == status.HTTP_200_OK
+    dbsession.refresh(comment)
+    assert comment.like_count == 0
+    assert comment.dislike_count == 0
