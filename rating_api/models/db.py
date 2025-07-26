@@ -137,7 +137,7 @@ class Comment(BaseDbModel):
     def search_by_lectorer_id(self, query: int) -> bool:
         if not query:
             return true()
-        return Comment.lecturer_id == query
+        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
@@ -149,7 +149,7 @@ class Comment(BaseDbModel):
     def search_by_subject(self, query: str) -> bool:
         if not query:
             return true()
-        return func.lower(Comment.subject).contains(query.lower())
+        return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
 
 
 class LecturerUserComment(BaseDbModel):
