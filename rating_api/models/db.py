@@ -6,9 +6,24 @@ import uuid
 from enum import Enum
 
 from fastapi_sqlalchemy import db
-from sqlalchemy import UUID, Boolean, DateTime
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    DateTime,
+)
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, desc, func, nulls_last, or_, true
+from sqlalchemy import (
+    ForeignKey,
+    Integer,
+    String,
+    UnaryExpression,
+    and_,
+    desc,
+    func,
+    nulls_last,
+    or_,
+    true,
+)
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -117,6 +132,9 @@ class Comment(BaseDbModel):
         primaryjoin="and_(Comment.lecturer_id == Lecturer.id, not_(Lecturer.is_deleted))",
     )
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+    likes: Mapped[list[CommentLike]] = relationship(
+        "CommentLike", back_populates="comment", cascade="all, delete-orphan"
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_property
@@ -151,11 +169,38 @@ class Comment(BaseDbModel):
             return true()
         return func.lower(Comment.subject).contains(query.lower())
 
+    @hybrid_property
+    def like_count(self) -> int:
+        """Python access to like count"""
+        return sum(1 for like in self.likes if like.like == 1)
+
+    @hybrid_property
+    def dislike_count(self) -> int:
+        """Python access to dislike count"""
+        return sum(1 for like in self.likes if like.like == -1)
+
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
-    create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    create_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
+    update_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class CommentLike(BaseDbModel):
+    uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    comment_uuid: Mapped[UUID] = mapped_column(UUID, ForeignKey("comment.uuid"), nullable=False)
+    like: Mapped[int] = mapped_column(Integer, default=0)  # 1 for like, -1 for dislike
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc)
+    )
+    edited_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    comment = relationship("Comment", back_populates="likes")

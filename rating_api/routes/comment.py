@@ -17,7 +17,7 @@ from rating_api.exceptions import (
     TooManyCommentsToLecturer,
     UpdateError,
 )
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, CommentLike, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
@@ -214,7 +214,6 @@ async def get_comments(
             else Comment.order_by_create_ts(order_by, asc_order)
         )
     )
-
     comments = comments_query.limit(limit).offset(offset).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
@@ -317,3 +316,35 @@ async def delete_comment(
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
+
+
+@comment.post("/{uuid}/like", response_model=CommentGet)
+async def like_comment(
+    uuid: UUID,
+    like: Literal["1", "-1"] = Query(description="1 for like, -1 for dislike"),
+    user=Depends(UnionAuth()),
+) -> CommentGet:
+    """
+    Likes or dislikes a comment by UUID
+    """
+    like = int(like)
+    comment = Comment.get(session=db.session, id=uuid)
+    if not comment:
+        raise ObjectNotFound(Comment, uuid)
+
+    existing_like = (
+        CommentLike.query(session=db.session)
+        .filter(
+            CommentLike.user_id == user.get("id"),
+            CommentLike.comment_uuid == comment.uuid,
+        )
+        .first()
+    )
+
+    if existing_like and existing_like.like != like:
+        new_like = CommentLike.update(session=db.session, id=existing_like.uuid, like=like)
+    elif not existing_like:
+        CommentLike.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, like=like)
+    else:
+        CommentLike.delete(session=db.session, id=existing_like.uuid)
+    return CommentGet.model_validate(comment)
