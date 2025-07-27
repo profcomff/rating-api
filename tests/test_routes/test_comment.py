@@ -361,16 +361,21 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
 
 
 def test_post_like(client, dbsession, comment):
-    response = client.post(f'{url}/{comment.uuid}/like', params={'like': 1})
+    # Like
+    response = client.put(f'{url}/{comment.uuid}/like')
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 1
-    response = client.post(f'{url}/{comment.uuid}/like', params={'like': -1})
+
+    # Dislike
+    response = client.put(f'{url}/{comment.uuid}/dislike')
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 0
     assert comment.dislike_count == 1
-    response = client.post(f'{url}/{comment.uuid}/like', params={'like': -1})
+
+    # click dislike one more time
+    response = client.put(f'{url}/{comment.uuid}/dislike')
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 0

@@ -17,7 +17,7 @@ from rating_api.exceptions import (
     TooManyCommentsToLecturer,
     UpdateError,
 )
-from rating_api.models import Comment, CommentLike, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, CommentReaction, Lecturer, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
@@ -318,44 +318,47 @@ async def delete_comment(
     )
 
 
-@comment.post("/{uuid}/like", response_model=CommentGet)
+@comment.put("/{uuid}/{reaction}", response_model=CommentGet)
 async def like_comment(
     uuid: UUID,
-    like: Literal["1", "-1"] = Query(description="1 for like, -1 for dislike"),
+    reaction: Reaction,
     user=Depends(UnionAuth()),
 ) -> CommentGet:
     """
-    Likes or dislikes a comment by UUID.
+    Handles like/dislike reactions for a comment.
+
+    This endpoint allows authenticated users to react to a comment (like/dislike) or change their existing reaction.
+    If the user has no existing reaction, a new one is created. If the user changes their reaction, it gets updated.
+    If the user clicks the same reaction again, the reaction is removed.
 
     Args:
-        uuid: The UUID of the comment to like/dislike.
-        like: The type of reaction ("1" for like, "-1" for dislike).
-        user: The authenticated user obtained from UnionAuth dependency.
+        uuid (UUID): The UUID of the comment to react to.
+        reaction (Reaction): The reaction type (like/dislike).
+        user (dict): Authenticated user data from UnionAuth dependency.
 
     Returns:
-        CommentGet: The updated comment data.
+        CommentGet: The updated comment with reactions in CommentGet format.
 
     Raises:
-        ObjectNotFound: If the comment with given UUID is not found.
+        ObjectNotFound: If the comment with given UUID doesn't exist.
     """
-    like = int(like)
     comment = Comment.get(session=db.session, id=uuid)
     if not comment:
         raise ObjectNotFound(Comment, uuid)
 
-    existing_like = (
-        CommentLike.query(session=db.session)
+    existing_reaction = (
+        CommentReaction.query(session=db.session)
         .filter(
-            CommentLike.user_id == user.get("id"),
-            CommentLike.comment_uuid == comment.uuid,
+            CommentReaction.user_id == user.get("id"),
+            CommentReaction.comment_uuid == comment.uuid,
         )
         .first()
     )
 
-    if existing_like and existing_like.like != like:
-        new_like = CommentLike.update(session=db.session, id=existing_like.uuid, like=like)
-    elif not existing_like:
-        CommentLike.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, like=like)
+    if existing_reaction and existing_reaction.reaction != reaction:
+        new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)
+    elif not existing_reaction:
+        CommentReaction.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, reaction=reaction)
     else:
-        CommentLike.delete(session=db.session, id=existing_like.uuid)
+        CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
     return CommentGet.model_validate(comment)
