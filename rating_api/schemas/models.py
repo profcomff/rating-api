@@ -37,8 +37,8 @@ class CommentGetWithStatus(Base):
     mark_general: float
     lecturer_id: int
     review_status: ReviewStatus
-    like_count: int = 0
-    dislike_count: int = 0
+    like_count: int
+    dislike_count: int
 
 
 class CommentGetWithAllInfo(Base):
