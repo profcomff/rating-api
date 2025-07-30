@@ -17,7 +17,7 @@ from rating_api.exceptions import (
     TooManyCommentsToLecturer,
     UpdateError,
 )
-from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, CommentReaction, Lecturer, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
@@ -214,7 +214,6 @@ async def get_comments(
             else Comment.order_by_create_ts(order_by, asc_order)
         )
     )
-
     comments = comments_query.limit(limit).offset(offset).all()
     if not comments:
         raise ObjectNotFound(Comment, 'all')
@@ -317,3 +316,49 @@ async def delete_comment(
     return StatusResponseModel(
         status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
     )
+
+
+@comment.put("/{uuid}/{reaction}", response_model=CommentGet)
+async def like_comment(
+    uuid: UUID,
+    reaction: Reaction,
+    user=Depends(UnionAuth()),
+) -> CommentGet:
+    """
+    Handles like/dislike reactions for a comment.
+
+    This endpoint allows authenticated users to react to a comment (like/dislike) or change their existing reaction.
+    If the user has no existing reaction, a new one is created. If the user changes their reaction, it gets updated.
+    If the user clicks the same reaction again, the reaction is removed.
+
+    Args:
+        uuid (UUID): The UUID of the comment to react to.
+        reaction (Reaction): The reaction type (like/dislike).
+        user (dict): Authenticated user data from UnionAuth dependency.
+
+    Returns:
+        CommentGet: The updated comment with reactions in CommentGet format.
+
+    Raises:
+        ObjectNotFound: If the comment with given UUID doesn't exist.
+    """
+    comment = Comment.get(session=db.session, id=uuid)
+    if not comment:
+        raise ObjectNotFound(Comment, uuid)
+
+    existing_reaction = (
+        CommentReaction.query(session=db.session)
+        .filter(
+            CommentReaction.user_id == user.get("id"),
+            CommentReaction.comment_uuid == comment.uuid,
+        )
+        .first()
+    )
+
+    if existing_reaction and existing_reaction.reaction != reaction:
+        new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)
+    elif not existing_reaction:
+        CommentReaction.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, reaction=reaction)
+    else:
+        CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
+    return CommentGet.model_validate(comment)
