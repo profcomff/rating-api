@@ -15,7 +15,6 @@ from rating_api.exceptions import (
     ObjectNotFound,
     TooManyCommentRequests,
     TooManyCommentsToLecturer,
-    UpdateError,
 )
 from rating_api.models import Comment, CommentReaction, Lecturer, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
@@ -309,7 +308,7 @@ async def delete_comment(
     has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes')]
 
     # Если нет привилегии - проверяем права обычного пользователя
-    if not has_delete_scope and (comment.is_anonymous or comment.user_id != user.get('id')):
+    if not has_delete_scope and (comment.user_id == None or comment.user_id != user.get('id')):
         raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
