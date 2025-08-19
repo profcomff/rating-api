@@ -6,9 +6,24 @@ import uuid
 from enum import Enum
 
 from fastapi_sqlalchemy import db
-from sqlalchemy import UUID, Boolean, DateTime
+from sqlalchemy import (
+    UUID,
+    Boolean,
+    DateTime,
+)
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import ForeignKey, Integer, String, UnaryExpression, and_, desc, func, nulls_last, or_, true
+from sqlalchemy import (
+    ForeignKey,
+    Integer,
+    String,
+    UnaryExpression,
+    and_,
+    desc,
+    func,
+    nulls_last,
+    or_,
+    true,
+)
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
@@ -117,6 +132,9 @@ class Comment(BaseDbModel):
         primaryjoin="and_(Comment.lecturer_id == Lecturer.id, not_(Lecturer.is_deleted))",
     )
     review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+    reactions: Mapped[list[CommentReaction]] = relationship(
+        "CommentReaction", back_populates="comment", cascade="all, delete-orphan"
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     @hybrid_property
@@ -137,7 +155,7 @@ class Comment(BaseDbModel):
     def search_by_lectorer_id(self, query: int) -> bool:
         if not query:
             return true()
-        return Comment.lecturer_id == query
+        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
@@ -149,13 +167,47 @@ class Comment(BaseDbModel):
     def search_by_subject(self, query: str) -> bool:
         if not query:
             return true()
-        return func.lower(Comment.subject).contains(query.lower())
+        return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
+
+    @hybrid_property
+    def like_count(self) -> int:
+        """Python access to like count"""
+        return sum(1 for like in self.reactions if like.reaction == 'like')
+
+    @hybrid_property
+    def dislike_count(self) -> int:
+        """Python access to dislike count"""
+        return sum(1 for like in self.reactions if like.reaction == 'dislike')
 
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
-    create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    create_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
+    update_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc), nullable=False
+    )
     is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class Reaction(str, Enum):
+    LIKE: str = "like"
+    DISLIKE: str = "dislike"
+
+
+class CommentReaction(BaseDbModel):
+    uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    comment_uuid: Mapped[UUID] = mapped_column(UUID, ForeignKey("comment.uuid"), nullable=False)
+    reaction: Mapped[Reaction] = mapped_column(
+        DbEnum(Reaction, native_enum=False), nullable=False
+    )  # 1 for like, -1 for dislike
+    created_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc)
+    )
+    edited_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    comment = relationship("Comment", back_populates="reactions")

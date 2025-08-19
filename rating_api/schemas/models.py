@@ -24,6 +24,8 @@ class CommentGet(Base):
     mark_clarity: int
     mark_general: float
     lecturer_id: int
+    like_count: int
+    dislike_count: int
 
 
 class CommentGetWithStatus(Base):
@@ -39,6 +41,8 @@ class CommentGetWithStatus(Base):
     mark_general: float
     lecturer_id: int
     review_status: ReviewStatus
+    like_count: int
+    dislike_count: int
 
 
 class CommentGetWithAllInfo(Base):
@@ -55,6 +59,8 @@ class CommentGetWithAllInfo(Base):
     lecturer_id: int
     review_status: ReviewStatus
     approved_by: int | None = None
+    like_count: int
+    dislike_count: int
 
 
 class CommentPost(Base):
