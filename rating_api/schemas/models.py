@@ -28,57 +28,12 @@ class CommentGet(Base):
     dislike_count: int
 
 
-class CommentGetWithStatus(Base):
-    uuid: UUID
-    user_id: int | None = None
-    create_ts: datetime.datetime
-    update_ts: datetime.datetime
-    subject: str | None = None
-    text: str
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
-    mark_general: float
-    lecturer_id: int
+class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
-    like_count: int
-    dislike_count: int
 
 
-class CommentGetWithAllInfo(Base):
-    uuid: UUID
-    user_id: int | None = None
-    create_ts: datetime.datetime
-    update_ts: datetime.datetime
-    subject: str | None = None
-    text: str
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
-    mark_general: float
-    lecturer_id: int
-    review_status: ReviewStatus
+class CommentGetWithAllInfo(CommentGetWithStatus):
     approved_by: int | None = None
-    like_count: int
-    dislike_count: int
-
-
-class CommentPost(Base):
-    subject: str
-    text: str
-    create_ts: datetime.datetime | None = None
-    update_ts: datetime.datetime | None = None
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
-    is_anonymous: bool = True
-
-    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
-    @classmethod
-    def validate_mark(cls, value):
-        if value not in [-2, -1, 0, 1, 2]:
-            raise WrongMark()
-        return value
 
 
 class CommentUpdate(Base):
@@ -96,22 +51,16 @@ class CommentUpdate(Base):
         return value
 
 
-class CommentImport(Base):
-    lecturer_id: int
-    subject: str | None = None
-    text: str
+class CommentPost(CommentUpdate):
     create_ts: datetime.datetime | None = None
     update_ts: datetime.datetime | None = None
-    mark_kindness: int
-    mark_freebie: int
-    mark_clarity: int
+    is_anonymous: bool = True
 
-    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
-    @classmethod
-    def validate_mark(cls, value):
-        if value not in [-2, -1, 0, 1, 2]:
-            raise WrongMark()
-        return value
+
+class CommentImport(CommentUpdate):
+    lecturer_id: int
+    create_ts: datetime.datetime | None = None
+    update_ts: datetime.datetime | None = None
 
 
 class CommentImportAll(Base):
@@ -127,16 +76,10 @@ class CommentGetAll(Base):
 
 class CommentGetAllWithStatus(Base):
     comments: list[CommentGetWithStatus] = []
-    limit: int
-    offset: int
-    total: int
 
 
 class CommentGetAllWithAllInfo(Base):
     comments: list[CommentGetWithAllInfo] = []
-    limit: int
-    offset: int
-    total: int
 
 
 class LecturerUserCommentPost(Base):
@@ -175,12 +118,10 @@ class LecturerPost(Base):
     timetable_id: int | None = None
 
 
-class LecturerPatch(Base):
+class LecturerPatch(LecturerPost):
     first_name: str | None = None
     last_name: str | None = None
     middle_name: str | None = None
-    avatar_link: str | None = None
-    timetable_id: int | None = None
 
 
 class LecturersFilter(Filter):
