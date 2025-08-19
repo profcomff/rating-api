@@ -205,7 +205,10 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
                     func.avg(Comment.mark_clarity).label('avg_clarity'),
                     func.avg(Comment.mark_general).label('avg_general'),
                 )
-                 .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
+                 .join(
+                    Comment, and_(Comment.review_status == ReviewStatus.APPROVED,
+                                  Lecturer.id == Comment.lecturer_id)
+                 )
                  .group_by(Lecturer.id))
             ).all()
             with db():
@@ -214,12 +217,19 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
                 (*lecturer,
                  calc_weighted_mark(
                      float(lecturer[-1]),
-                     Comment.query(session=dbsession).filter(and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == lecturer[0])).count(),
+                     Comment.query(session=dbsession).filter(
+                        and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == lecturer[0])
+                    ).count(),
                      mean_mark_general))
                 for lecturer in db_res
             }
             resp_lecturers = {
-                (lecturer['id'], lecturer['mark_freebie'], lecturer['mark_kindness'], lecturer['mark_clarity'], lecturer['mark_general'], lecturer['mark_weighted'])
+                (lecturer['id'],
+                 lecturer['mark_freebie'],
+                 lecturer['mark_kindness'],
+                 lecturer['mark_clarity'],
+                 lecturer['mark_general'],
+                 lecturer['mark_weighted'])
                 for lecturer in resp.json()['lecturers']
             }
             assert resp_lecturers == db_lecturers

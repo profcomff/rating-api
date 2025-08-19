@@ -1,14 +1,13 @@
 import datetime
+from typing import List
 from uuid import UUID
-from typing import List, Literal, Optional
 
 from fastapi import Query
-from pydantic import Field, field_validator, ValidationError, ValidationInfo
 from fastapi_filter.contrib.sqlalchemy import Filter
-from sqlalchemy import func, or_
+from pydantic import ValidationInfo, field_validator
 
 from rating_api.exceptions import WrongMark
-from rating_api.models import ReviewStatus, Lecturer, Comment
+from rating_api.models import Lecturer, ReviewStatus
 from rating_api.schemas.base import Base
 
 
@@ -127,7 +126,9 @@ class LecturerPatch(LecturerPost):
 class LecturersFilter(Filter):
     subject: str = ''
     name: str = ''
-    order_by: List[str] = ['mark_weighted',]
+    order_by: List[str] = [
+        'mark_weighted',
+    ]
 
     @field_validator("*", mode="before", check_fields=False)
     def validate_order_by(cls, value, field: ValidationInfo):
@@ -136,7 +137,14 @@ class LecturersFilter(Filter):
     @field_validator('order_by', mode='before')
     def check_order_param(cls, value: str) -> str:
         """Проверяет, что значение поля (без +/-) входит в список возможных."""
-        allowed_ordering = {"mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"}
+        allowed_ordering = {
+            "mark_weighted",
+            "mark_kindness",
+            "mark_freebie",
+            "mark_clarity",
+            "mark_general",
+            "last_name",
+        }
         cleaned_value = value.replace("+", "").replace("-", "")
         if cleaned_value in allowed_ordering:
             return value
@@ -149,7 +157,7 @@ class LecturersFilter(Filter):
         if self.name:
             query = query.filter(self.Constants.model.search_by_name(self.name))
         return query
-    
+
     def sort(self, query: Query) -> Query:
         if not self.ordering_values:
             return query
@@ -166,6 +174,6 @@ class LecturersFilter(Filter):
             else:
                 query = query.order_by(*self.Constants.model.order_by_name(field_name, direction))
             return query
-    
+
     class Constants(Filter.Constants):
         model = Lecturer

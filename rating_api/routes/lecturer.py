@@ -2,14 +2,21 @@ from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
+from fastapi_filter import FilterDepends
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
-from fastapi_filter import FilterDepends
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost, LecturersFilter
+from rating_api.schemas.models import (
+    CommentGet,
+    LecturerGet,
+    LecturerGetAll,
+    LecturerPatch,
+    LecturerPost,
+    LecturersFilter,
+)
 from rating_api.utils.mark import calc_weighted_mark
 
 
@@ -77,7 +84,7 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
 
 @lecturer.get("", response_model=LecturerGetAll)
 async def get_lecturers(
-    lecturer_filter = FilterDepends(LecturersFilter),
+    lecturer_filter=FilterDepends(LecturersFilter),
     limit: int = 10,
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
@@ -129,9 +136,11 @@ async def get_lecturers(
                 for comment in db_lecturer.comments
                 if comment.review_status is ReviewStatus.APPROVED
             ]
-            if (mark is not None
+            if (
+                mark is not None
                 and approved_comments
-                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) < mark):
+                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) < mark
+            ):
                 continue
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = sorted(
