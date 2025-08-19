@@ -218,7 +218,7 @@ async def get_lecturers(
     больше, чем переданный 'mark'.
     """
     lecturers_query = lecturer_filter.filter(
-        Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)
+        Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)  # TODO: потестить без части с outerjoin.
     )
     lecturers_query = lecturer_filter.sort(lecturers_query)
     lecturers_query = lecturer_filter.sort(lecturers_query)
