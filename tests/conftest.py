@@ -149,6 +149,7 @@ def lecturers_with_comments(dbsession, lecturers):
       with 6 comments to non-deleted lecturers 4 approved and one dismissed and one pending.
         Two of them have alike names.
         Two of them have a different user_id.
+        One of them have a different subject.
     """
     comments_data = [
         (lecturers[0].id, 9990, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
@@ -168,7 +169,7 @@ def lecturers_with_comments(dbsession, lecturers):
         (lecturers[2].id, 9990, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
         (lecturers[2].id, 9990, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
         (lecturers[2].id, 9991, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[2].id, 9992, 'test_subject12', ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[2].id, 9992, 'test_subject13', ReviewStatus.APPROVED, 0, 0, 0),
     ]
 
     comments = []
