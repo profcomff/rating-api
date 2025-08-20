@@ -14,6 +14,9 @@ format:
 	autoflake -r --in-place --remove-all-unused-imports ./migrations
 	isort ./migrations
 	black ./migrations
+	autoflake -r --in-place --remove-all-unused-imports ./tests
+	isort ./tests
+	black ./tests
 	
 db:
 	docker run -d -p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust --name db-rating_api postgres:15
