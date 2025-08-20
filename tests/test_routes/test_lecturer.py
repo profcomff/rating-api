@@ -1,11 +1,11 @@
 import logging
 
 import pytest
-from starlette import status
-from sqlalchemy import and_, select, func
 from fastapi_sqlalchemy import db
+from sqlalchemy import and_, func, select
+from starlette import status
 
-from rating_api.models import Lecturer, Comment, ReviewStatus
+from rating_api.models import Comment, Lecturer, ReviewStatus
 from rating_api.settings import get_settings
 from rating_api.utils.mark import calc_weighted_mark
 
@@ -101,17 +101,17 @@ def test_get_lecturers_by_name(client, lecturers, query, total, response_status)
 
 @pytest.mark.usefixtures('lecturers_with_comments')
 @pytest.mark.parametrize(
-        'query, response_status',
-        [
-            ({'subject': 'test_subject'}, status.HTTP_200_OK),
-            ({'subject': 'test_subject13'}, status.HTTP_200_OK),
-            ({'subject': 'test_subject666'}, status.HTTP_404_NOT_FOUND),
-        ],
-        ids=[
-            'get_all',
-            'get_some',
-            'wrong_subject',
-        ]
+    'query, response_status',
+    [
+        ({'subject': 'test_subject'}, status.HTTP_200_OK),
+        ({'subject': 'test_subject13'}, status.HTTP_200_OK),
+        ({'subject': 'test_subject666'}, status.HTTP_404_NOT_FOUND),
+    ],
+    ids=[
+        'get_all',
+        'get_some',
+        'wrong_subject',
+    ],
 )
 def test_get_lecturers_by_subject(client, dbsession, query, response_status):
     """
@@ -122,8 +122,8 @@ def test_get_lecturers_by_subject(client, dbsession, query, response_status):
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
         db_lecturers = {
-            comment.lecturer_id for comment in
-            Comment.query(session=dbsession).filter(
+            comment.lecturer_id
+            for comment in Comment.query(session=dbsession).filter(
                 and_(Comment.review_status == ReviewStatus.APPROVED, Comment.subject == query['subject'])
             )
         }
@@ -133,21 +133,15 @@ def test_get_lecturers_by_subject(client, dbsession, query, response_status):
 
 @pytest.mark.usefixtures('lecturers_with_comments')
 @pytest.mark.parametrize(
-        'query, response_status',
-        [
-            ({'mark': -2}, status.HTTP_200_OK),
-            ({'mark': 0}, status.HTTP_200_OK),
-            ({'mark': 2}, status.HTTP_404_NOT_FOUND),
-            ({'mark': -3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-            ({'mark': 3}, status.HTTP_422_UNPROCESSABLE_ENTITY)
-        ],
-        ids=[
-            'get_all',
-            'get_some',
-            'get_nothing',
-            'under_min',
-            'above_max'
-        ]        
+    'query, response_status',
+    [
+        ({'mark': -2}, status.HTTP_200_OK),
+        ({'mark': 0}, status.HTTP_200_OK),
+        ({'mark': 2}, status.HTTP_404_NOT_FOUND),
+        ({'mark': -3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({'mark': 3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+    ],
+    ids=['get_all', 'get_some', 'get_nothing', 'under_min', 'above_max'],
 )
 def test_get_lecturers_by_mark(client, dbsession, query, response_status):
     """
@@ -158,10 +152,12 @@ def test_get_lecturers_by_mark(client, dbsession, query, response_status):
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
         res = dbsession.execute(
-            (select(Lecturer.id.label('lecturer'), func.avg(Comment.mark_general).label('avg'))
-             .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
-             .group_by(Lecturer.id)
-             .having(func.avg(Comment.mark_general) >= query['mark']))
+            (
+                select(Lecturer.id.label('lecturer'), func.avg(Comment.mark_general).label('avg'))
+                .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
+                .group_by(Lecturer.id)
+                .having(func.avg(Comment.mark_general) >= query['mark'])
+            )
         ).all()
         resp_lecturers = {lecturer['id'] for lecturer in resp.json()['lecturers']}
         db_lecturers = {req[0] for req in res}
@@ -179,14 +175,7 @@ def test_get_lecturers_by_mark(client, dbsession, query, response_status):
         ({'info': {}}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         ({'info': ['pupupu']}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
-    ids=[
-        "comments_and_marks",
-        "only_comments",
-        "only_marks",
-        "no_info",
-        "invalid_iterator",
-        "invalid_param"
-    ]
+    ids=["comments_and_marks", "only_comments", "only_marks", "no_info", "invalid_iterator", "invalid_param"],
 )
 def test_get_lecturers_by_info(client, dbsession, query, response_status):
     """
@@ -198,49 +187,60 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
     if response_status == status.HTTP_200_OK:
         if 'mark' in query['info']:
             db_res = dbsession.execute(
-                (select(
-                    Lecturer.id.label('lecturer'),
-                    func.avg(Comment.mark_freebie).label('avg_freebie'),
-                    func.avg(Comment.mark_kindness).label('avg_kindness'),
-                    func.avg(Comment.mark_clarity).label('avg_clarity'),
-                    func.avg(Comment.mark_general).label('avg_general'),
+                (
+                    select(
+                        Lecturer.id.label('lecturer'),
+                        func.avg(Comment.mark_freebie).label('avg_freebie'),
+                        func.avg(Comment.mark_kindness).label('avg_kindness'),
+                        func.avg(Comment.mark_clarity).label('avg_clarity'),
+                        func.avg(Comment.mark_general).label('avg_general'),
+                    )
+                    .join(
+                        Comment,
+                        and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id),
+                    )
+                    .group_by(Lecturer.id)
                 )
-                 .join(
-                    Comment, and_(Comment.review_status == ReviewStatus.APPROVED,
-                                  Lecturer.id == Comment.lecturer_id)
-                 )
-                 .group_by(Lecturer.id))
             ).all()
             with db():
                 mean_mark_general = Lecturer.mean_mark_general()
             db_lecturers = {
-                (*lecturer,
-                 calc_weighted_mark(
-                     float(lecturer[-1]),
-                     Comment.query(session=dbsession).filter(
-                        and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == lecturer[0])
-                    ).count(),
-                     mean_mark_general))
+                (
+                    *lecturer,
+                    calc_weighted_mark(
+                        float(lecturer[-1]),
+                        Comment.query(session=dbsession)
+                        .filter(
+                            and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == lecturer[0])
+                        )
+                        .count(),
+                        mean_mark_general,
+                    ),
+                )
                 for lecturer in db_res
             }
             resp_lecturers = {
-                (lecturer['id'],
-                 lecturer['mark_freebie'],
-                 lecturer['mark_kindness'],
-                 lecturer['mark_clarity'],
-                 lecturer['mark_general'],
-                 lecturer['mark_weighted'])
+                (
+                    lecturer['id'],
+                    lecturer['mark_freebie'],
+                    lecturer['mark_kindness'],
+                    lecturer['mark_clarity'],
+                    lecturer['mark_general'],
+                    lecturer['mark_weighted'],
+                )
                 for lecturer in resp.json()['lecturers']
             }
             assert resp_lecturers == db_lecturers
         if 'comments' in query['info']:
             db_res = dbsession.execute(
-                (select(
-                    Lecturer.id.label('lecturer'),
-                    func.count(Comment.uuid)
+                (
+                    select(Lecturer.id.label('lecturer'), func.count(Comment.uuid))
+                    .join(
+                        Comment,
+                        and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id),
+                    )
+                    .group_by(Lecturer.id)
                 )
-                 .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
-                 .group_by(Lecturer.id))
             ).all()
             db_lecturers = {*db_res}
             assert len(resp.json()['lecturers']) == len(db_lecturers)
@@ -259,14 +259,7 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
         ({'order_by': 'pupupu'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         ({'order_by': 'mark_kindness,mark_freebie'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
-    ids=[
-        "valid",
-        "valid_default",
-        "valid_plus",
-        "valid_minus",
-        "invalid_param",
-        "invalid_many_params"
-    ]
+    ids=["valid", "valid_default", "valid_plus", "valid_minus", "invalid_param", "invalid_many_params"],
 )
 def test_get_lecturers_order_by(client, dbsession, query, response_status):
     """
