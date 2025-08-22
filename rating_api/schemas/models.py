@@ -31,7 +31,8 @@ class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
 
 
-class CommentGetWithAllInfo(CommentGetWithStatus):
+class CommentGetWithAllInfo(CommentGet):
+    review_status: ReviewStatus
     approved_by: int | None = None
 
 
