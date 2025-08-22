@@ -101,6 +101,11 @@ async def get_lecturers(
     Если передано просто так (или с '+' в начале параметра), то сортирует по возрастанию
     С '-' в начале -- по убыванию.
 
+    *Пример запросов с этим параметром*:
+    - `...?order_by=-mark_kindness`
+    - `...?order_by=mark_freebie`
+    - `...?order_by=+mark_freebie` (эквивалентно 2ому пункту)
+
     `info` - возможные значения `'comments'`, `'mark'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
     Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
@@ -119,7 +124,6 @@ async def get_lecturers(
     lecturers_query = lecturer_filter.filter(
         Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)
     )
-    lecturers_query = lecturer_filter.sort(lecturers_query)
     lecturers_query = lecturer_filter.sort(lecturers_query)
     lecturers = lecturers_query.offset(offset).limit(limit).all()
     lecturers_count = lecturers_query.group_by(Lecturer.id).count()
