@@ -82,21 +82,6 @@ def db_container(get_settings_mock):
         container.stop()
 
 
-@pytest.fixture
-def client(mocker):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
-    user_mock.return_value = {
-        "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
-        "groups": [{"id": 0, "name": "string", "parent_id": 0}],
-        "id": 0,
-        "email": "string",
-    }
-    client = TestClient(app)
-    return client
-
-
 @pytest.fixture()
 def dbsession(db_container):
     """Фикстура настройки Session для работы с БД в тестах."""
@@ -119,15 +104,6 @@ def client(mocker):
     }
     client = TestClient(app)
     return client
-
-
-@pytest.fixture
-def dbsession() -> Session:
-    settings = Settings()
-    engine = create_engine(str(settings.DB_DSN), pool_pre_ping=True)
-    TestingSessionLocal = sessionmaker(bind=engine)
-    session = TestingSessionLocal()
-    yield session
 
 
 @pytest.fixture
