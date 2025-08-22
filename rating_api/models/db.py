@@ -13,6 +13,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import (
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -211,3 +212,12 @@ class CommentReaction(BaseDbModel):
     edited_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     comment = relationship("Comment", back_populates="reactions")
+
+
+class LecturerRating(BaseDbModel):
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Идентификатор препода")
+    mark_weighted: Mapped[float] = mapped_column(Float, comment="Взвешенная оценка преподавателя, посчитана в dwh")
+    mark_kindness_weighted: Mapped[float] = mapped_column(Float, comment="Взвешенная оценка доброты, посчитана в dwh")
+    mark_clarity_weighted: Mapped[float] = mapped_column(Float, comment="Взвешенная оценка понятности, посчитана в dwh")
+    mark_freebie_weighted: Mapped[float] = mapped_column(Float, comment="Взвешенная оценка халявности, посчитана в dwh")
+    rank: Mapped[int] = mapped_column(Integer, comment="Место в рейтинге, посчитана в dwh")

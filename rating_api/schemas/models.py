@@ -177,3 +177,12 @@ class LecturerPatch(Base):
     middle_name: str | None = None
     avatar_link: str | None = None
     timetable_id: int | None = None
+
+
+class LecturerRankGet(Base):
+    id: int | None = None
+    mark_weighted: float | None = None
+    mark_kindness_weighted: float | None = None
+    mark_clarity_weighted: float | None = None
+    mark_freebie_weighted: float | None = None
+    rank: float | None = None
