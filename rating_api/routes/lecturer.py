@@ -193,7 +193,7 @@ async def update_lecturer(
         .one_or_none()
     )
     if check_timetable_id:
-        raise AlreadyExists(Lecturer.timetable_id, lecturer_info.timetable_id)
+        raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
     result = LecturerGet.model_validate(
         Lecturer.update(lecturer.id, **lecturer_info.model_dump(exclude_unset=True), session=db.session)
