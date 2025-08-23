@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     """Application settings"""
 
     DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
+    DWH_DB_DSN: PostgresDsn = 'postgresql://postgres@localhost:5432/postgres'
     ROOT_PATH: str = '/' + os.getenv("APP_NAME", "")
     SERVICE_ID: int = os.getenv("SERVICE_ID", -3)  # Указать какой id сервиса
     COMMENT_FREQUENCY_IN_MONTH: int = 10

@@ -179,10 +179,28 @@ class LecturerPatch(Base):
     timetable_id: int | None = None
 
 
-class LecturerRankGet(Base):
+class LecturerRankRatingApi(Base):
     id: int | None = None
     mark_weighted: float | None = None
     mark_kindness_weighted: float | None = None
     mark_clarity_weighted: float | None = None
     mark_freebie_weighted: float | None = None
     rank: float | None = None
+
+
+class LecturerRankDWH(Base):
+    uuid: UUID | None = None
+    id: int
+    first_name: str | None = None
+    last_name: str | None = None
+    middle_name: str | None = None
+    subject: str | None = None
+    avatar_link: str | None = None
+    timetable_id: int | None = None
+    valid_from_dt: datetime.datetime
+    valid_to_dt: datetime.datetime
+    rank: int
+    mark_weighted: float
+    mark_kindness_weighted: float
+    mark_clarity_weighted: float
+    mark_freebie_weighted: float

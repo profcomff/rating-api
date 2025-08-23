@@ -87,3 +87,11 @@ class UpdateError(RatingAPIError):
             f"{msg} Conflict with update a resource that already exists or has conflicting information.",
             f"{msg} Конфликт с обновлением ресурса, который уже существует или имеет противоречивую информацию.",
         )
+
+
+class ValidObjectNotFound(RatingAPIError):
+    def __init__(self, obj: type, obj_id_or_name: int | str):
+        super().__init__(
+            f"Object {obj.__name__} {obj_id_or_name=} not found valid",
+            f"Объект {obj.__name__}  с идентификатором {obj_id_or_name} не найден валидным",
+        )

@@ -6,7 +6,7 @@ from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
-from rating_api.models import Comment, Lecturer, LecturerRating, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
@@ -14,7 +14,6 @@ from rating_api.schemas.models import (
     LecturerGetAll,
     LecturerPatch,
     LecturerPost,
-    LecturerRankGet,
 )
 from rating_api.utils.mark import calc_weighted_mark
 
@@ -225,11 +224,3 @@ async def delete_lecturer(
     return StatusResponseModel(
         status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI"
     )
-
-
-@lecturer.get("/rank/{id}", response_model=LecturerRankGet)
-async def get_marks_and_rank(
-    id: int,
-) -> LecturerRankGet:
-    result = LecturerRating.get(id, session=db.session)
-    return LecturerRankGet.model_validate(result)
