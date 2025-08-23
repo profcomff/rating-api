@@ -1,13 +1,94 @@
+import importlib
+import sys
 import uuid
+from functools import lru_cache
+from pathlib import Path
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
+from alembic import command
+from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
+from testcontainers.postgres import PostgresContainer
 
 from rating_api.models.db import *
 from rating_api.routes import app
-from rating_api.settings import Settings
+from rating_api.settings import Settings, get_settings
+
+
+class PostgresConfig:
+    """Дата-класс со значениями для контейнера с тестовой БД и alembic-миграции."""
+
+    container_name: str = 'rating_test'
+    username: str = 'postgres'
+    host: str = 'localhost'
+    image: str = 'postgres:15'
+    external_port: int = 5433
+    ham: str = 'trust'
+    alembic_ini: str = Path(__file__).resolve().parent.parent / 'alembic.ini'
+
+    @classmethod
+    def get_url(cls):
+        """Возвращает URI для подключения к БД."""
+        return f'postgresql://{cls.username}@{cls.host}:{cls.external_port}/postgres'
+
+
+@pytest.fixture(scope="session")
+def session_mp():
+    """Аналог monkeypatch, но с session-scope."""
+    mp = MonkeyPatch()
+    yield mp
+    mp.undo()
+
+
+@pytest.fixture(scope='session')
+def get_settings_mock(session_mp):
+    """Переопределение get_settings в rating_api/settings.py и перезагрузка base.app."""
+
+    @lru_cache
+    def get_test_settings() -> Settings:
+        settings = Settings()
+        settings.DB_DSN = PostgresConfig.get_url()
+        return settings
+
+    get_settings.cache_clear()
+    dsn_mock = session_mp.setattr('rating_api.settings.get_settings', get_test_settings)
+    reloaded_module = sys.modules['rating_api.routes.base']
+    importlib.reload(reloaded_module)
+    importlib.reload(sys.modules['rating_api.routes.exc_handlers'])
+    globals()['app'] = reloaded_module.app
+    return dsn_mock
+
+
+@pytest.fixture(scope="session")
+def db_container(get_settings_mock):
+    """Фикстура настройки БД для тестов в Docker-контейнере."""
+    container = (
+        PostgresContainer(
+            image=PostgresConfig.image, username=PostgresConfig.username, dbname=PostgresConfig.container_name
+        )
+        .with_bind_ports(5432, PostgresConfig.external_port)
+        .with_env("POSTGRES_HOST_AUTH_METHOD", PostgresConfig.ham)
+    )
+    container.start()
+    cfg = AlembicConfig(str(PostgresConfig.alembic_ini.resolve()))
+    cfg.set_main_option("script_location", "%(here)s/migrations")
+    command.upgrade(cfg, "head")
+    try:
+        yield PostgresConfig.get_url()
+    finally:
+        container.stop()
+
+
+@pytest.fixture()
+def dbsession(db_container):
+    """Фикстура настройки Session для работы с БД в тестах."""
+    engine = create_engine(str(db_container), pool_pre_ping=True)
+    TestingSessionLocal = sessionmaker(bind=engine)
+    session = TestingSessionLocal()
+    yield session
 
 
 @pytest.fixture
@@ -23,15 +104,6 @@ def client(mocker):
     }
     client = TestClient(app)
     return client
-
-
-@pytest.fixture
-def dbsession() -> Session:
-    settings = Settings()
-    engine = create_engine(str(settings.DB_DSN), pool_pre_ping=True)
-    TestingSessionLocal = sessionmaker(bind=engine)
-    session = TestingSessionLocal()
-    yield session
 
 
 @pytest.fixture
