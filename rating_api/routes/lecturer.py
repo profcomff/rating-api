@@ -2,13 +2,21 @@ from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
+from fastapi_filter import FilterDepends
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
+from rating_api.schemas.models import (
+    CommentGet,
+    LecturerGet,
+    LecturerGetAll,
+    LecturerPatch,
+    LecturerPost,
+    LecturersFilter,
+)
 from rating_api.utils.mark import calc_weighted_mark
 
 
@@ -76,16 +84,11 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
 
 @lecturer.get("", response_model=LecturerGetAll)
 async def get_lecturers(
+    lecturer_filter=FilterDepends(LecturersFilter),
     limit: int = 10,
     offset: int = 0,
     info: list[Literal["comments", "mark"]] = Query(default=[]),
-    order_by: str = Query(
-        enum=["mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"],
-        default="mark_weighted",
-    ),
-    subject: str = Query(''),
-    name: str = Query(''),
-    asc_order: bool = False,
+    mark: float = Query(default=None, ge=-2, le=2),
 ) -> LecturerGetAll:
     """
     `limit` - максимальное количество возвращаемых преподавателей
@@ -95,6 +98,13 @@ async def get_lecturers(
     `order_by` - возможные значения `"mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"`.
     Если передано `'last_name'` - возвращается список преподавателей отсортированных по алфавиту по фамилиям
     Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
+    Если передано просто так (или с '+' в начале параметра), то сортирует по возрастанию
+    С '-' в начале -- по убыванию.
+
+    *Пример запросов с этим параметром*:
+    - `...?order_by=-mark_kindness`
+    - `...?order_by=mark_freebie`
+    - `...?order_by=+mark_freebie` (эквивалентно 2ому пункту)
 
     `info` - возможные значения `'comments'`, `'mark'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
@@ -107,30 +117,17 @@ async def get_lecturers(
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
 
-    `asc_order`
-    Если передано true, сортировать в порядке возрастания
-    Иначе - в порядке убывания
+    `mark`
+    Поле для оценки. Если передано, то возвращает только тех преподавателей, для которых средняя общая оценка ('general_mark')
+    больше, чем переданный 'mark'.
     """
-    lecturers_query = (
-        Lecturer.query(session=db.session)
-        .outerjoin(Lecturer.comments)
-        .group_by(Lecturer.id)
-        .filter(Lecturer.search_by_subject(subject))
-        .filter(Lecturer.search_by_name(name))
-        .order_by(
-            *(
-                Lecturer.order_by_mark(order_by, asc_order)
-                if "mark" in order_by
-                else Lecturer.order_by_name(order_by, asc_order)
-            )
-        )
+    lecturers_query = lecturer_filter.filter(
+        Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)
     )
-
+    lecturers_query = lecturer_filter.sort(lecturers_query)
     lecturers = lecturers_query.offset(offset).limit(limit).all()
     lecturers_count = lecturers_query.group_by(Lecturer.id).count()
 
-    if not lecturers:
-        raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
     if "mark" in info:
         mean_mark_general = Lecturer.mean_mark_general()
@@ -143,6 +140,12 @@ async def get_lecturers(
                 for comment in db_lecturer.comments
                 if comment.review_status is ReviewStatus.APPROVED
             ]
+            if (
+                mark is not None
+                and approved_comments
+                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) <= mark
+            ):
+                continue
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = sorted(
                     approved_comments, key=lambda comment: comment.create_ts, reverse=True
@@ -166,6 +169,8 @@ async def get_lecturers(
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
+    if len(result.lecturers) == 0:
+        raise ObjectNotFound(Lecturer, 'all')
     return result
 
 

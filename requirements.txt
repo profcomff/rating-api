@@ -3,6 +3,7 @@ auth-lib-profcomff[fastapi]
 aiohttp
 fastapi
 fastapi-sqlalchemy
+fastapi-filter[sqlalchemy]
 gunicorn
 logging-profcomff
 psycopg2-binary
