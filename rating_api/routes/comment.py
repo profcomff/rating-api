@@ -126,7 +126,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             else:
                 give_achievement = False
         if give_achievement:
-            await session.post(
+            session.post(
                 settings.API_URL
                 + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
                 headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},

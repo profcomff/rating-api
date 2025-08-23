@@ -156,7 +156,7 @@ def test_get_lecturers_by_mark(client, dbsession, query, response_status):
                 select(Lecturer.id.label('lecturer'), func.avg(Comment.mark_general).label('avg'))
                 .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
                 .group_by(Lecturer.id)
-                .having(func.avg(Comment.mark_general) >= query['mark'])
+                .having(func.avg(Comment.mark_general) > query['mark'])
             )
         ).all()
         resp_lecturers = {lecturer['id'] for lecturer in resp.json()['lecturers']}

@@ -143,7 +143,7 @@ async def get_lecturers(
             if (
                 mark is not None
                 and approved_comments
-                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) < mark
+                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) <= mark
             ):
                 continue
             if "comments" in info and approved_comments:
