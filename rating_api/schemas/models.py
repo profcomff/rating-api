@@ -102,6 +102,15 @@ class LecturerGet(Base):
     mark_weighted: float | None = None
     comments: list[CommentGet] | None = None
 
+class LecturerRank(Base):
+    id: int
+    mark_weighted: float
+    mark_kindness_weighted: float | None = None
+    mark_clarity_weighted: float | None = None
+    mark_freebie_weighted: float | None = None
+    rank: int
+    update_ts: datetime.datetime
+
 
 class LecturerGetAll(Base):
     lecturers: list[LecturerGet] = []
