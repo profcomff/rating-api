@@ -102,6 +102,7 @@ class LecturerGet(Base):
     mark_weighted: float | None = None
     comments: list[CommentGet] | None = None
 
+
 class LecturerRank(Base):
     id: int
     mark_weighted: float

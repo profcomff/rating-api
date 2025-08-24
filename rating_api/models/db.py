@@ -13,9 +13,9 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import (
+    Float,
     ForeignKey,
     Integer,
-    Float,
     String,
     UnaryExpression,
     and_,

@@ -12,10 +12,10 @@ from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
     LecturerGet,
-    LecturerRank,
     LecturerGetAll,
     LecturerPatch,
     LecturerPost,
+    LecturerRank,
     LecturersFilter,
 )
 from rating_api.utils.mark import calc_weighted_mark
@@ -229,8 +229,8 @@ async def delete_lecturer(
 @lecturer.post("/{rating}", response_model=LecturerRank)
 async def create_lecturer_rating(
     lecturer_rank_info: LecturerRank,
-    allow_none = False,
-)-> LecturerRank:
+    allow_none=False,
+) -> LecturerRank:
     """
     Создает рейтинг преподавателя в базе данных RatingAPI
     """
