@@ -46,6 +46,33 @@ async def create_lecturer(
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
+@lecturer.patch("/import_rating", response_model=list[LecturerWithRank])
+async def update_lecturer_rating(
+    lecturer_rank_info: list[LecturerWithRank],
+    _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
+) -> list[LecturerWithRank]:
+    """
+    Обновляет рейтинг преподавателя в базе данных RatingAPI
+    """
+    updated_lecturers = []
+    for lecturer_rank in lecturer_rank_info:
+        try:
+            LecturerWithRank.model_validate(lecturer_rank)
+        except ValidationException:
+            raise ValidationException
+
+        lecturer_rank_dumped = lecturer_rank.model_dump()
+        lecturer_rank_dumped["update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        # Извлекаем ID и удаляем его из словаря, чтобы не передавать дважды
+        lecturer_id = lecturer_rank_dumped.pop("id")
+
+        if Lecturer.get(id=lecturer_id, session=db.session):
+            updated_lecturers.append(Lecturer.update(id=lecturer_id, session=db.session, **lecturer_rank_dumped))
+
+    return updated_lecturers
+
+
 @lecturer.get("/{id}", response_model=LecturerGet)
 async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(default=[])) -> LecturerGet:
     """
@@ -206,7 +233,9 @@ async def update_lecturer(
 
 
 @lecturer.delete("/{id}", response_model=StatusResponseModel)
-async def delete_lecturer(id: int, allow_none=False, auto_error=True):
+async def delete_lecturer(
+    id: int, _=Depends(UnionAuth(scopes=["rating.lecturer.delete"], allow_none=False, auto_error=True))
+):
     """
     Scopes: `["rating.lecturer.delete"]`
     """
@@ -224,32 +253,3 @@ async def delete_lecturer(id: int, allow_none=False, auto_error=True):
     return StatusResponseModel(
         status="Success", message="Lecturer has been deleted", ru="Преподаватель удален из RatingAPI"
     )
-
-
-@lecturer.patch("/import_rating", response_model=list[LecturerWithRank])
-async def update_lecturer_rating(
-    lecturer_rank_info: list[LecturerWithRank],
-    _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
-) -> list[LecturerWithRank]:
-    """
-    Обновляет рейтинг преподавателя в базе данных RatingAPI
-
-    """
-    updated_lecturers = []
-    for lecturer_rank in lecturer_rank_info:
-        try:
-            LecturerWithRank.model_validate(lecturer_rank)
-        except ValidationException:
-            raise ValidationException
-
-        lecturer_rank_dumped = lecturer_rank.model_dump()
-        lecturer_rank_dumped["update_ts"] = datetime.datetime.now(datetime.timezone.utc())
-        if Lecturer.get(id=lecturer_rank_dumped["id"], session=db.session):
-            updated_lecturers.append(
-                Lecturer.update(id=lecturer_rank_dumped["id"], session=db.session, **lecturer_rank_dumped)
-            )
-        else:
-            raise ObjectNotFound(Lecturer, id)
-
-    db.commit()
-    return updated_lecturers

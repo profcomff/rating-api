@@ -109,15 +109,13 @@ class LecturerWithRank(Base):
     last_name: str
     middle_name: str
     avatar_link: str | None = None
-    subjects: list[str] | None = None
     timetable_id: int
-    comments: list[CommentGet] | None = None
     mark_weighted: float
-    mark_kindness_weighted: float | None = None
-    mark_clarity_weighted: float | None = None
-    mark_freebie_weighted: float | None = None
+    mark_kindness_weighted: float
+    mark_clarity_weighted: float
+    mark_freebie_weighted: float
     rank: int
-    update_ts: datetime.datetime
+    update_ts: datetime.datetime | None = None
 
 
 class LecturerGetAll(Base):

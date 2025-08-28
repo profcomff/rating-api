@@ -1,6 +1,6 @@
 import datetime
 import logging
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi_sqlalchemy import db
@@ -361,54 +361,38 @@ def test_delete_lecturer(client, dbsession, lecturers_with_comments):
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-"""
-@pytest.fixture
-def mock_union_auth():
-    with patch("rating_api.routes.lecturer.UnionAuth.__call__", new_callable=AsyncMock) as mock_auth:
-        mock_auth.return_value = True
-        yield mock_auth
-
-"""
-
-
+@pytest.mark.usefixtures('lecturers')
 @pytest.mark.parametrize(
     'body, response_status',
     [
         (
             {
-                "id": 101,
-                "first_name": "Иван",
-                "last_name": "Петров",
-                "middle_name": "Сергеевич",
-                "avatar_link": "https://example.com/avatars/ipetrov.jpg",
-                "subjects": ["Математика", "Физика"],
-                "timetable_id": 5001,
-                "comments": None,
-                "mark_weighted": 4.7,
-                "mark_kindness_weighted": 4.9,
-                "mark_clarity_weighted": 4.5,
-                "mark_freebie_weighted": 3.8,
+                "id": 1,
+                "first_name": "test_fname1",
+                "last_name": "test_lname1",
+                "middle_name": "test_mname1",
+                "timetable_id": 9900,
+                "mark_weighted": 4.5,
+                "mark_kindness_weighted": 4.0,
+                "mark_clarity_weighted": 4.8,
+                "mark_freebie_weighted": 3.9,
                 "rank": 12,
-                "update_ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             },
             status.HTTP_200_OK,
         ),
         (
             {
-                "id": 1,
-                "first_name": "Иван",
-                "last_name": "Иванов",
-                "middle_name": "Иванович",
+                "id": 2,
+                "first_name": "test_fname2",
+                "last_name": "test_lname2",
+                "middle_name": "test_mname2",
                 "avatar_link": None,
-                "subjects": ["Математика", "Физика"],
-                "timetable_id": 100,
-                "comments": None,
+                "timetable_id": 9901,
                 "mark_weighted": 4.5,
                 "mark_kindness_weighted": 4.0,
                 "mark_clarity_weighted": 4.8,
                 "mark_freebie_weighted": 3.9,
                 "rank": 5,
-                "update_ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             },
             status.HTTP_200_OK,
         ),
@@ -416,12 +400,21 @@ def mock_union_auth():
 )
 def test_lecturer_rating_update(client, dbsession, body, response_status):
     response = client.patch('/lecturer/import_rating', json=[body])
-    if response.status_code != response_status:
-        print(f"Response: {response.json()}")
+
     if response_status == status.HTTP_200_OK:
-        data = response.json()
-        assert isinstance(data, list)
-        updated_lecturer = data[0]
-        assert updated_lecturer["id"] == body["id"]
+
+        lecturers = response.json()
+        assert isinstance(lecturers, list)
+
+        updated_lecturer = None
+        for lecturer in lecturers:
+            if lecturer["id"] == body["id"]:
+                updated_lecturer = lecturer
+                break
+
+        assert updated_lecturer is not None, f"Lecturer with id {body['id']} not found in response"
+
         assert updated_lecturer["rank"] == body["rank"]
-        assert updated_lecturer["first_name"] == body["first_name"]
+
+        if "first_name" in body:
+            assert updated_lecturer["first_name"] == body["first_name"]
