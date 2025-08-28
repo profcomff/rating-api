@@ -1,13 +1,15 @@
+import datetime
 from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
+from fastapi.exceptions import ValidationException
 from fastapi_filter import FilterDepends
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
-from rating_api.models import Comment, Lecturer, LecturerRating, LecturerUserComment, ReviewStatus
+from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
 from rating_api.schemas.models import (
     CommentGet,
@@ -15,8 +17,8 @@ from rating_api.schemas.models import (
     LecturerGetAll,
     LecturerPatch,
     LecturerPost,
-    LecturerRank,
     LecturersFilter,
+    LecturerWithRank,
 )
 from rating_api.utils.mark import calc_weighted_mark
 
@@ -204,9 +206,7 @@ async def update_lecturer(
 
 
 @lecturer.delete("/{id}", response_model=StatusResponseModel)
-async def delete_lecturer(
-    id: int, _=Depends(UnionAuth(scopes=["rating.lecturer.delete"], allow_none=False, auto_error=True))
-):
+async def delete_lecturer(id: int, allow_none=False, auto_error=True):
     """
     Scopes: `["rating.lecturer.delete"]`
     """
@@ -226,14 +226,30 @@ async def delete_lecturer(
     )
 
 
-@lecturer.post("/{rating}", response_model=LecturerRank)
-async def create_lecturer_rating(
-    lecturer_rank_info: LecturerRank,
-    allow_none=False,
-) -> LecturerRank:
+@lecturer.patch("/import_rating", response_model=list[LecturerWithRank])
+async def update_lecturer_rating(
+    lecturer_rank_info: list[LecturerWithRank],
+    _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
+) -> list[LecturerWithRank]:
     """
-    Создает рейтинг преподавателя в базе данных RatingAPI
+    Обновляет рейтинг преподавателя в базе данных RatingAPI
+
     """
-    new_lecturer_rating: LecturerRating = LecturerRating.create(session=db.session, **lecturer_rank_info.model_dump())
-    db.session.commit()
-    return LecturerRank.model_validate(new_lecturer_rating)
+    updated_lecturers = []
+    for lecturer_rank in lecturer_rank_info:
+        try:
+            LecturerWithRank.model_validate(lecturer_rank)
+        except ValidationException:
+            raise ValidationException
+
+        lecturer_rank_dumped = lecturer_rank.model_dump()
+        lecturer_rank_dumped["update_ts"] = datetime.datetime.now(datetime.timezone.utc())
+        if Lecturer.get(id=lecturer_rank_dumped["id"], session=db.session):
+            updated_lecturers.append(
+                Lecturer.update(id=lecturer_rank_dumped["id"], session=db.session, **lecturer_rank_dumped)
+            )
+        else:
+            raise ObjectNotFound(Lecturer, id)
+
+    db.commit()
+    return updated_lecturers

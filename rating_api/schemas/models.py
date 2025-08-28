@@ -103,8 +103,15 @@ class LecturerGet(Base):
     comments: list[CommentGet] | None = None
 
 
-class LecturerRank(Base):
+class LecturerWithRank(Base):
     id: int
+    first_name: str
+    last_name: str
+    middle_name: str
+    avatar_link: str | None = None
+    subjects: list[str] | None = None
+    timetable_id: int
+    comments: list[CommentGet] | None = None
     mark_weighted: float
     mark_kindness_weighted: float | None = None
     mark_clarity_weighted: float | None = None

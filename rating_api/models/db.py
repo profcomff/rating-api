@@ -44,14 +44,43 @@ class ReviewStatus(str, Enum):
 
 
 class Lecturer(BaseDbModel):
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    first_name: Mapped[str] = mapped_column(String, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, nullable=False)
-    middle_name: Mapped[str] = mapped_column(String, nullable=False)
-    avatar_link: Mapped[str] = mapped_column(String, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Идентификатор преподавателя")
+    first_name: Mapped[str] = mapped_column(String, nullable=False, comment="Имя препода")
+    last_name: Mapped[str] = mapped_column(String, nullable=False, comment="Фамилия препода")
+    middle_name: Mapped[str] = mapped_column(String, nullable=False, comment="Отчество препода")
+    avatar_link: Mapped[str] = mapped_column(String, nullable=True, comment="Ссылка на аву препода")
     timetable_id: Mapped[int]
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
-    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mark_weighted: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default='0.0',
+        default=0,
+        comment="Взвешенная оценка преподавателя, посчитана в dwh",
+    )
+    mark_kindness_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка доброты, посчитана в dwh"
+    )
+    mark_clarity_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка понятности, посчитана в dwh"
+    )
+    mark_freebie_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка халявности, посчитана в dwh"
+    )
+    rank: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default='0', default=0, comment="Место в рейтинге, посчитана в dwh"
+    )
+    rank_update_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        default=datetime.datetime.now(),
+        comment="Время обновления записи",
+    )
+
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, comment="Идентификатор софт делита"
+    )
 
     @hybrid_method
     def search_by_name(self, query: str) -> bool:
@@ -212,21 +241,3 @@ class CommentReaction(BaseDbModel):
     edited_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     comment = relationship("Comment", back_populates="reactions")
-
-
-class LecturerRating(BaseDbModel):
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Идентификатор препода")
-    mark_weighted: Mapped[float] = mapped_column(
-        Float, nullable=True, comment="Взвешенная оценка преподавателя, посчитана в dwh"
-    )
-    mark_kindness_weighted: Mapped[float] = mapped_column(
-        Float, nullable=True, comment="Взвешенная оценка доброты, посчитана в dwh"
-    )
-    mark_clarity_weighted: Mapped[float] = mapped_column(
-        Float, nullable=True, comment="Взвешенная оценка понятности, посчитана в dwh"
-    )
-    mark_freebie_weighted: Mapped[float] = mapped_column(
-        Float, nullable=True, comment="Взвешенная оценка халявности, посчитана в dwh"
-    )
-    rank: Mapped[int] = mapped_column(Integer, nullable=True, comment="Место в рейтинге, посчитана в dwh")
-    update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=True, comment="Время обновления записи")
