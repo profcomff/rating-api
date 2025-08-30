@@ -407,4 +407,3 @@ def test_lecturer_rating_update(client, dbsession, body, response_status):
         assert isinstance(response_dict, dict)
 
         assert response_dict["failed"] == 0
-        

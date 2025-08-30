@@ -77,14 +77,13 @@ async def update_lecturer_rating(
             updated_lecturers.append(Lecturer.update(id=lecturer_id, session=db.session, **lecturer_rank_dumped))
         else:
             success_fl = False
-        
+
         if success_fl:
             response["updated"] += 1
             response["updated_id"].append(lecturer_id)
         else:
             response["failed"] += 1
             response["failed_id"].append(lecturer_id)
-
 
     return response
 
