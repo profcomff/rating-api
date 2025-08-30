@@ -403,18 +403,8 @@ def test_lecturer_rating_update(client, dbsession, body, response_status):
 
     if response_status == status.HTTP_200_OK:
 
-        lecturers = response.json()
-        assert isinstance(lecturers, list)
+        response_dict = response.json()
+        assert isinstance(response_dict, dict)
 
-        updated_lecturer = None
-        for lecturer in lecturers:
-            if lecturer["id"] == body["id"]:
-                updated_lecturer = lecturer
-                break
-
-        assert updated_lecturer is not None, f"Lecturer with id {body['id']} not found in response"
-
-        assert updated_lecturer["rank"] == body["rank"]
-
-        if "first_name" in body:
-            assert updated_lecturer["first_name"] == body["first_name"]
+        assert response_dict["failed"] == 0
+        

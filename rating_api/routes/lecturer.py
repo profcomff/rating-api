@@ -46,31 +46,47 @@ async def create_lecturer(
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
-@lecturer.patch("/import_rating", response_model=list[LecturerWithRank])
+@lecturer.patch("/import_rating", response_model=dict)
 async def update_lecturer_rating(
     lecturer_rank_info: list[LecturerWithRank],
     _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
-) -> list[LecturerWithRank]:
+) -> dict:
     """
     Обновляет рейтинг преподавателя в базе данных RatingAPI
     """
     updated_lecturers = []
+    response = {
+        "updated": 0,
+        "failed": 0,
+        "updated_id": [],
+        "failed_id": [],
+    }
     for lecturer_rank in lecturer_rank_info:
+        success_fl = True
         try:
             LecturerWithRank.model_validate(lecturer_rank)
         except ValidationException:
-            raise ValidationException
+            success_fl = False
 
         lecturer_rank_dumped = lecturer_rank.model_dump()
         lecturer_rank_dumped["update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
 
-        # Извлекаем ID и удаляем его из словаря, чтобы не передавать дважды
         lecturer_id = lecturer_rank_dumped.pop("id")
 
         if Lecturer.get(id=lecturer_id, session=db.session):
             updated_lecturers.append(Lecturer.update(id=lecturer_id, session=db.session, **lecturer_rank_dumped))
+        else:
+            success_fl = False
+        
+        if success_fl:
+            response["updated"] += 1
+            response["updated_id"].append(lecturer_id)
+        else:
+            response["failed"] += 1
+            response["failed_id"].append(lecturer_id)
 
-    return updated_lecturers
+
+    return response
 
 
 @lecturer.get("/{id}", response_model=LecturerGet)
