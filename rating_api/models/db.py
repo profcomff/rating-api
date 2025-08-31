@@ -111,11 +111,15 @@ class Lecturer(BaseDbModel):
         self, query: str, asc_order: bool
     ) -> tuple[UnaryExpression[float], InstrumentedAttribute, InstrumentedAttribute]:
         if "mark_weighted" in query:
-            comments_num = func.count(self.comments).filter(Comment.review_status == ReviewStatus.APPROVED)
-            lecturer_mark_general = func.avg(Comment.mark_general).filter(
-                Comment.review_status == ReviewStatus.APPROVED
-            )
-            expression = calc_weighted_mark(lecturer_mark_general, comments_num, Lecturer.mean_mark_general())
+            expression = self.mark_weighted
+        elif "mark_clarity_weighted" in query:
+            expression = self.mark_clarity_weighted
+        elif "mark_freebie_weighted" in query:
+            expression = self.mark_freebie_weighted
+        elif "mark_kindness_weighted" in query:
+            expression = self.mark_kindness_weighted
+        elif "rank" in query:
+            expression = self.rank
         else:
             expression = func.avg(getattr(Comment, query)).filter(Comment.review_status == ReviewStatus.APPROVED)
         if not asc_order:
@@ -127,21 +131,6 @@ class Lecturer(BaseDbModel):
         self, query: str, asc_order: bool
     ) -> tuple[UnaryExpression[str] | InstrumentedAttribute, InstrumentedAttribute]:
         return (getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()), Lecturer.id
-
-    @staticmethod
-    def mean_mark_general() -> float:
-        mark_general_rows = (
-            db.session.query(func.avg(Comment.mark_general))
-            .filter(Comment.review_status == ReviewStatus.APPROVED)
-            .group_by(Comment.lecturer_id)
-            .all()
-        )
-        mean_mark_general = float(
-            sum(mark_general_row[0] for mark_general_row in mark_general_rows) / len(mark_general_rows)
-            if len(mark_general_rows) != 0
-            else 0
-        )
-        return mean_mark_general
 
 
 class Comment(BaseDbModel):
