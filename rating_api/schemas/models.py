@@ -194,3 +194,10 @@ class LecturersFilter(Filter):
 
     class Constants(Filter.Constants):
         model = Lecturer
+
+
+class LecturerUpdateRatingPatch(Base):
+    updated: int
+    failed: int
+    updated_id: list[int]
+    failed_id: list[int]

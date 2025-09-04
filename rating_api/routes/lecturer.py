@@ -18,6 +18,7 @@ from rating_api.schemas.models import (
     LecturerPatch,
     LecturerPost,
     LecturersFilter,
+    LecturerUpdateRatingPatch,
     LecturerWithRank,
 )
 from rating_api.utils.mark import calc_weighted_mark
@@ -46,12 +47,14 @@ async def create_lecturer(
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
-@lecturer.patch("/import_rating", response_model=dict)
+@lecturer.patch("/import_rating", response_model=LecturerUpdateRatingPatch)
 async def update_lecturer_rating(
     lecturer_rank_info: list[LecturerWithRank],
     _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
-) -> dict:
+) -> LecturerUpdateRatingPatch:
     """
+    Scopes: `["rating.lecturer.impor_rating"]`
+
     Обновляет рейтинг преподавателя в базе данных RatingAPI
     """
     updated_lecturers = []
@@ -84,8 +87,9 @@ async def update_lecturer_rating(
         else:
             response["failed"] += 1
             response["failed_id"].append(lecturer_id)
+    response_validated = LecturerUpdateRatingPatch.model_validate(**response)
 
-    return response
+    return response_validated
 
 
 @lecturer.get("/{id}", response_model=LecturerGet)
