@@ -18,8 +18,8 @@ from rating_api.schemas.models import (
     LecturerPatch,
     LecturerPost,
     LecturersFilter,
-    LecturerWithRank,
     LecturerUpdateRatingPatch,
+    LecturerWithRank,
 )
 from rating_api.utils.mark import calc_weighted_mark
 
