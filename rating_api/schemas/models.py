@@ -95,12 +95,28 @@ class LecturerGet(Base):
     avatar_link: str | None = None
     subjects: list[str] | None = None
     timetable_id: int
-    mark_kindness: float | None = None
-    mark_freebie: float | None = None
-    mark_clarity: float | None = None
-    mark_general: float | None = None
+    mark_kindness_weighted: float | None = None
+    mark_clarity_weighted: float | None = None
+    mark_freebie_weighted: float | None = None
     mark_weighted: float | None = None
+    rank: int | None = None
+    update_ts: datetime.datetime | None = None
     comments: list[CommentGet] | None = None
+
+
+class LecturerWithRank(Base):
+    id: int
+    first_name: str
+    last_name: str
+    middle_name: str
+    avatar_link: str | None = None
+    timetable_id: int
+    mark_weighted: float
+    mark_kindness_weighted: float
+    mark_clarity_weighted: float
+    mark_freebie_weighted: float
+    rank: int
+    update_ts: datetime.datetime | None = None
 
 
 class LecturerGetAll(Base):

@@ -1,4 +1,6 @@
+import datetime
 import logging
+from unittest.mock import patch
 
 import pytest
 from fastapi_sqlalchemy import db
@@ -52,29 +54,32 @@ def test_get_lecturer(client, dbsession, lecturers, lecturer_n, response_status)
     assert get_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = get_response.json()
-        assert json_response["mark_kindness"] is None
-        assert json_response["mark_freebie"] is None
-        assert json_response["mark_clarity"] is None
-        assert json_response["mark_general"] is None
+        assert json_response["mark_kindness_weighted"] == 0.0
+        assert json_response["mark_freebie_weighted"] == 0.0
+        assert json_response["mark_clarity_weighted"] == 0.0
+        assert json_response["mark_weighted"] == 0.0
+        assert json_response["rank"] == 0
         assert json_response["comments"] is None
 
 
 @pytest.mark.parametrize(
-    'lecturer_n,mark_kindness,mark_freebie,mark_clarity,mark_general',
+    'lecturer_n,mark_kindness_weighted,mark_freebie_weighted,mark_clarity_weighted,mark_weighted',
     [(0, 1.5, 1.5, 1.5, 1.5), (1, 0, 0, 0, 0), (2, 0.5, 0.5, 0.5, 0.5)],
 )
 def test_get_lecturer_with_comments(
-    client, lecturers_with_comments, lecturer_n, mark_kindness, mark_freebie, mark_clarity, mark_general
+    client,
+    lecturers_with_comments,
+    lecturer_n,
+    mark_kindness_weighted,
+    mark_freebie_weighted,
+    mark_clarity_weighted,
+    mark_weighted,
 ):
     lecturers, comments = lecturers_with_comments
-    query = {"info": ['comments', 'mark']}
+    query = {"info": ['comments']}
     response = client.get(f'{url}/{lecturers[lecturer_n].id}', params=query)
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
-    assert json_response["mark_kindness"] == mark_kindness
-    assert json_response["mark_freebie"] == mark_freebie
-    assert json_response["mark_clarity"] == mark_clarity
-    assert json_response["mark_general"] == mark_general
     assert comments[lecturer_n * 6 + 0].subject in json_response["subjects"]
     assert comments[lecturer_n * 6 + 1].subject in json_response["subjects"]
     assert comments[lecturer_n * 6 + 2].subject not in json_response["subjects"]
@@ -168,14 +173,13 @@ def test_get_lecturers_by_mark(client, dbsession, query, response_status):
 @pytest.mark.parametrize(
     'query, response_status',
     [
-        ({'info': ['comments', 'mark']}, status.HTTP_200_OK),
         ({'info': ['comments']}, status.HTTP_200_OK),
-        ({'info': ['mark']}, status.HTTP_200_OK),
+        ({'info': ['comments']}, status.HTTP_200_OK),
         ({'info': []}, status.HTTP_200_OK),
         ({'info': {}}, status.HTTP_422_UNPROCESSABLE_ENTITY),
         ({'info': ['pupupu']}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
-    ids=["comments_and_marks", "only_comments", "only_marks", "no_info", "invalid_iterator", "invalid_param"],
+    ids=["comments", "comments", "no_info", "invalid_iterator", "invalid_param"],
 )
 def test_get_lecturers_by_info(client, dbsession, query, response_status):
     """
@@ -185,52 +189,6 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
     resp = client.get(f'{url}', params=query)
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
-        if 'mark' in query['info']:
-            db_res = dbsession.execute(
-                (
-                    select(
-                        Lecturer.id.label('lecturer'),
-                        func.avg(Comment.mark_freebie).label('avg_freebie'),
-                        func.avg(Comment.mark_kindness).label('avg_kindness'),
-                        func.avg(Comment.mark_clarity).label('avg_clarity'),
-                        func.avg(Comment.mark_general).label('avg_general'),
-                    )
-                    .join(
-                        Comment,
-                        and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id),
-                    )
-                    .group_by(Lecturer.id)
-                )
-            ).all()
-            with db():
-                mean_mark_general = Lecturer.mean_mark_general()
-            db_lecturers = {
-                (
-                    *lecturer,
-                    calc_weighted_mark(
-                        float(lecturer[-1]),
-                        Comment.query(session=dbsession)
-                        .filter(
-                            and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == lecturer[0])
-                        )
-                        .count(),
-                        mean_mark_general,
-                    ),
-                )
-                for lecturer in db_res
-            }
-            resp_lecturers = {
-                (
-                    lecturer['id'],
-                    lecturer['mark_freebie'],
-                    lecturer['mark_kindness'],
-                    lecturer['mark_clarity'],
-                    lecturer['mark_general'],
-                    lecturer['mark_weighted'],
-                )
-                for lecturer in resp.json()['lecturers']
-            }
-            assert resp_lecturers == db_lecturers
         if 'comments' in query['info']:
             db_res = dbsession.execute(
                 (
@@ -357,3 +315,51 @@ def test_delete_lecturer(client, dbsession, lecturers_with_comments):
     # trying to get deleted
     response = client.get(f'{url}/{lecturers[0].id}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.usefixtures('lecturers')
+@pytest.mark.parametrize(
+    'body, response_status',
+    [
+        (
+            {
+                "id": 1,
+                "first_name": "test_fname1",
+                "last_name": "test_lname1",
+                "middle_name": "test_mname1",
+                "timetable_id": 9900,
+                "mark_weighted": 4.5,
+                "mark_kindness_weighted": 4.0,
+                "mark_clarity_weighted": 4.8,
+                "mark_freebie_weighted": 3.9,
+                "rank": 12,
+            },
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "id": 2,
+                "first_name": "test_fname2",
+                "last_name": "test_lname2",
+                "middle_name": "test_mname2",
+                "avatar_link": None,
+                "timetable_id": 9901,
+                "mark_weighted": 4.5,
+                "mark_kindness_weighted": 4.0,
+                "mark_clarity_weighted": 4.8,
+                "mark_freebie_weighted": 3.9,
+                "rank": 5,
+            },
+            status.HTTP_200_OK,
+        ),
+    ],
+)
+def test_lecturer_rating_update(client, dbsession, body, response_status):
+    response = client.patch('/lecturer/import_rating', json=[body])
+
+    if response_status == status.HTTP_200_OK:
+
+        response_dict = response.json()
+        assert isinstance(response_dict, dict)
+
+        assert response_dict["failed"] == 0

@@ -1,7 +1,9 @@
+import datetime
 from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
+from fastapi.exceptions import ValidationException
 from fastapi_filter import FilterDepends
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
@@ -16,6 +18,7 @@ from rating_api.schemas.models import (
     LecturerPatch,
     LecturerPost,
     LecturersFilter,
+    LecturerWithRank,
 )
 from rating_api.utils.mark import calc_weighted_mark
 
@@ -43,17 +46,57 @@ async def create_lecturer(
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
+@lecturer.patch("/import_rating", response_model=dict)
+async def update_lecturer_rating(
+    lecturer_rank_info: list[LecturerWithRank],
+    _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
+) -> dict:
+    """
+    Обновляет рейтинг преподавателя в базе данных RatingAPI
+    """
+    updated_lecturers = []
+    response = {
+        "updated": 0,
+        "failed": 0,
+        "updated_id": [],
+        "failed_id": [],
+    }
+    for lecturer_rank in lecturer_rank_info:
+        success_fl = True
+        try:
+            LecturerWithRank.model_validate(lecturer_rank)
+        except ValidationException:
+            success_fl = False
+
+        lecturer_rank_dumped = lecturer_rank.model_dump()
+        lecturer_rank_dumped["update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        lecturer_id = lecturer_rank_dumped.pop("id")
+
+        if Lecturer.get(id=lecturer_id, session=db.session):
+            updated_lecturers.append(Lecturer.update(id=lecturer_id, session=db.session, **lecturer_rank_dumped))
+        else:
+            success_fl = False
+
+        if success_fl:
+            response["updated"] += 1
+            response["updated_id"].append(lecturer_id)
+        else:
+            response["failed"] += 1
+            response["failed_id"].append(lecturer_id)
+
+    return response
+
+
 @lecturer.get("/{id}", response_model=LecturerGet)
-async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(default=[])) -> LecturerGet:
+async def get_lecturer(id: int, info: list[Literal["comments"]] = Query(default=[])) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.read"]`
 
     Возвращает преподавателя по его ID в базе данных RatingAPI
 
-    *QUERY* `info: string` - возможные значения `'comments'`, `'mark'`.
+    *QUERY* `info: string` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
-
     Subject лектора возвращшается либо из базы данных, либо из любого аппрувнутого комментария
     """
     lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.id == id).one_or_none()
@@ -69,14 +112,6 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
         ]
         if "comments" in info and approved_comments:
             result.comments = sorted(approved_comments, key=lambda comment: comment.create_ts, reverse=True)
-        if "mark" in info and approved_comments:
-            result.mark_freebie = sum(comment.mark_freebie for comment in approved_comments) / len(approved_comments)
-            result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(approved_comments)
-            result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
-            result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(approved_comments)
-            result.mark_weighted = calc_weighted_mark(
-                result.mark_general, len(approved_comments), Lecturer.mean_mark_general()
-            )
         if approved_comments:
             result.subjects = list({comment.subject for comment in approved_comments})
     return result
@@ -87,7 +122,7 @@ async def get_lecturers(
     lecturer_filter=FilterDepends(LecturersFilter),
     limit: int = 10,
     offset: int = 0,
-    info: list[Literal["comments", "mark"]] = Query(default=[]),
+    info: list[Literal["comments"]] = Query(default=[]),
     mark: float = Query(default=None, ge=-2, le=2),
 ) -> LecturerGetAll:
     """
@@ -106,9 +141,8 @@ async def get_lecturers(
     - `...?order_by=mark_freebie`
     - `...?order_by=+mark_freebie` (эквивалентно 2ому пункту)
 
-    `info` - возможные значения `'comments'`, `'mark'`.
+    `info` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
 
     `subject`
     Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с одним из их предметов преподавания.
@@ -129,8 +163,6 @@ async def get_lecturers(
     lecturers_count = lecturers_query.group_by(Lecturer.id).count()
 
     result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
-    if "mark" in info:
-        mean_mark_general = Lecturer.mean_mark_general()
     for db_lecturer in lecturers:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
@@ -149,22 +181,6 @@ async def get_lecturers(
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = sorted(
                     approved_comments, key=lambda comment: comment.create_ts, reverse=True
-                )
-            if "mark" in info and approved_comments:
-                lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_weighted = calc_weighted_mark(
-                    lecturer_to_result.mark_general, len(approved_comments), mean_mark_general
                 )
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})

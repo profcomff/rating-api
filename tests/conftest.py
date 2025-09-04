@@ -184,25 +184,25 @@ def lecturers(dbsession):
     Creates 4 lecturers(one with flag is_deleted=True)
     """
     lecturers_data = [
-        ("test_fname1", "test_lname1", "test_mname1", 9900),
-        ("test_fname2", "test_lname2", "test_mname2", 9901),
-        ("Bibka", "Bobka", "Bobkovich", 9902),
+        (1, "test_fname1", "test_lname1", "test_mname1", 9900),
+        (2, "test_fname2", "test_lname2", "test_mname2", 9901),
+        (3, "Bibka", "Bobka", "Bobkovich", 9902),
     ]
 
     lecturers = [
-        Lecturer(first_name=fname, last_name=lname, middle_name=mname, timetable_id=timetable_id)
-        for fname, lname, mname, timetable_id in lecturers_data
+        Lecturer(id=lecturer_id, first_name=fname, last_name=lname, middle_name=mname, timetable_id=timetable_id)
+        for lecturer_id, fname, lname, mname, timetable_id in lecturers_data
     ]
     lecturers.append(
-        Lecturer(first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
+        Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
     )
     lecturers[-1].is_deleted = True
     for lecturer in lecturers:
         dbsession.add(lecturer)
     dbsession.commit()
     yield lecturers
+
     for lecturer in lecturers:
-        dbsession.refresh(lecturer)
         for row in lecturer.comments:
             dbsession.delete(row)
         lecturer_user_comments = dbsession.query(LecturerUserComment).filter(
