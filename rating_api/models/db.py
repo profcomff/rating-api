@@ -18,10 +18,12 @@ from sqlalchemy import (
     String,
     UnaryExpression,
     and_,
+    case,
     desc,
     func,
     nulls_last,
     or_,
+    select,
     true,
 )
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
@@ -170,14 +172,64 @@ class Comment(BaseDbModel):
         return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
 
     @hybrid_property
-    def like_count(self) -> int:
-        """Python access to like count"""
-        return sum(1 for like in self.reactions if like.reaction == 'like')
+    def like_count(self):
+        """Python доступ к числу лайков"""
+        return sum(1 for reaction in self.reactions if reaction.reaction == Reaction.LIKE)
+
+    @like_count.expression
+    def like_count(cls):
+        """SQL выражение для подсчета лайков"""
+        return (
+            select(func.count(CommentReaction.uuid))
+            .where(and_(CommentReaction.comment_uuid == cls.uuid, CommentReaction.reaction == Reaction.LIKE))
+            .label('like_count')
+        )
 
     @hybrid_property
-    def dislike_count(self) -> int:
-        """Python access to dislike count"""
-        return sum(1 for like in self.reactions if like.reaction == 'dislike')
+    def dislike_count(self):
+        """Python доступ к числу дизлайков"""
+        return sum(1 for reaction in self.reactions if reaction.reaction == Reaction.DISLIKE)
+
+    @dislike_count.expression
+    def dislike_count(cls):
+        """SQL выражение для подсчета дизлайков"""
+        return (
+            select(func.count(CommentReaction.uuid))
+            .where(and_(CommentReaction.comment_uuid == cls.uuid, CommentReaction.reaction == Reaction.DISLIKE))
+            .label('dislike_count')
+        )
+
+    @hybrid_property
+    def like_dislike_diff(self):
+        """Python доступ к разнице лайков и дизлайков"""
+        if hasattr(self, '_like_dislike_diff'):
+            return self._like_dislike_diff
+        return self.like_count - self.dislike_count
+
+    @like_dislike_diff.expression
+    def like_dislike_diff(cls):
+        """SQL выражение для вычисления разницы лайков/дизлайков"""
+        return (
+            select(
+                func.sum(
+                    case(
+                        (CommentReaction.reaction == Reaction.LIKE, 1),
+                        (CommentReaction.reaction == Reaction.DISLIKE, -1),
+                        else_=0,
+                    )
+                )
+            )
+            .where(CommentReaction.comment_uuid == cls.uuid)
+            .label('like_dislike_diff')
+        )
+
+    @hybrid_method
+    def order_by_like_diff(cls, asc_order: bool = False):
+        """Метод для сортировки по разнице лайков/дизлайков"""
+        if asc_order:
+            return cls.like_dislike_diff.asc()
+        else:
+            return cls.like_dislike_diff.desc()
 
 
 class LecturerUserComment(BaseDbModel):

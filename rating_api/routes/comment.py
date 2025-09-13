@@ -174,7 +174,7 @@ async def get_comments(
     user_id: int | None = None,
     subject: str | None = None,
     order_by: str = Query(
-        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
+        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "like_diff"],
         default="create_ts",
     ),
     unreviewed: bool = False,
@@ -190,9 +190,10 @@ async def get_comments(
      Если без смещения возвращается комментарий с условным номером N,
      то при значении offset = X будет возвращаться комментарий с номером N + X
 
-    `order_by` - возможные значения `"create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"`.
-     Если передано `'create_ts'` - возвращается список комментариев отсортированных по времени
-     Если передано `'mark_...'` - возвращается список комментариев отсортированных по конкретной оценке
+    `order_by` - возможные значения `"create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "like_diff"`.
+     Если передано `'create_ts'` - возвращается список комментариев, отсортированных по времени
+     Если передано `'mark_...'` - возвращается список комментариев, отсортированных по конкретной оценке
+     Если передано `'like_diff'` - возвращается список комментариев, отсортированных по разнице лайков и дизлайков
 
      `lecturer_id` - вернет все комментарии для преподавателя с конкретным id, по дефолту возвращает вообще все аппрувнутые комментарии.
 
@@ -210,7 +211,11 @@ async def get_comments(
         .order_by(
             Comment.order_by_mark(order_by, asc_order)
             if "mark" in order_by
-            else Comment.order_by_create_ts(order_by, asc_order)
+            else (
+                Comment.order_by_like_diff(asc_order)
+                if order_by == "like_diff"
+                else Comment.order_by_create_ts(order_by, asc_order)
+            )
         )
     )
     comments = comments_query.limit(limit).offset(offset).all()
