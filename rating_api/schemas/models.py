@@ -76,10 +76,16 @@ class CommentGetAll(Base):
 
 class CommentGetAllWithStatus(Base):
     comments: list[CommentGetWithStatus] = []
+    limit: int
+    offset: int
+    total: int
 
 
 class CommentGetAllWithAllInfo(Base):
     comments: list[CommentGetWithAllInfo] = []
+    limit: int
+    offset: int
+    total: int
 
 
 class LecturerUserCommentPost(Base):

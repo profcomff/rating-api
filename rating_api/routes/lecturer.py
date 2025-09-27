@@ -21,7 +21,6 @@ from rating_api.schemas.models import (
     LecturerUpdateRatingPatch,
     LecturerWithRank,
 )
-from rating_api.utils.mark import calc_weighted_mark
 
 
 lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
@@ -53,7 +52,7 @@ async def update_lecturer_rating(
     _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
 ) -> LecturerUpdateRatingPatch:
     """
-    Scopes: `["rating.lecturer.impor_rating"]`
+    Scopes: `["rating.lecturer.update_rating"]`
 
     Обновляет рейтинг преподавателя в базе данных RatingAPI
     """
@@ -72,7 +71,7 @@ async def update_lecturer_rating(
             success_fl = False
 
         lecturer_rank_dumped = lecturer_rank.model_dump()
-        lecturer_rank_dumped["update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
+        lecturer_rank_dumped["rank_update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
 
         lecturer_id = lecturer_rank_dumped.pop("id")
 
@@ -87,7 +86,7 @@ async def update_lecturer_rating(
         else:
             response["failed"] += 1
             response["failed_id"].append(lecturer_id)
-    response_validated = LecturerUpdateRatingPatch.model_validate(**response)
+    response_validated = LecturerUpdateRatingPatch.model_validate(response)
 
     return response_validated
 

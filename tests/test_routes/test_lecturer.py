@@ -1,6 +1,4 @@
-import datetime
 import logging
-from unittest.mock import patch
 
 import pytest
 from fastapi_sqlalchemy import db
@@ -9,7 +7,6 @@ from starlette import status
 
 from rating_api.models import Comment, Lecturer, ReviewStatus
 from rating_api.settings import get_settings
-from rating_api.utils.mark import calc_weighted_mark
 
 
 logger = logging.getLogger(__name__)

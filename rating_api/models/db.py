@@ -5,7 +5,6 @@ import logging
 import uuid
 from enum import Enum
 
-from fastapi_sqlalchemy import db
 from sqlalchemy import (
     UUID,
     Boolean,
@@ -28,8 +27,6 @@ from sqlalchemy import (
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
-
-from rating_api.utils.mark import calc_weighted_mark
 
 from .base import BaseDbModel
 
