@@ -1,15 +1,26 @@
+import datetime
 from typing import Literal
 
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
+from fastapi.exceptions import ValidationException
+from fastapi_filter import FilterDepends
 from fastapi_sqlalchemy import db
 from sqlalchemy import and_
 
 from rating_api.exceptions import AlreadyExists, ObjectNotFound
 from rating_api.models import Comment, Lecturer, LecturerUserComment, ReviewStatus
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import CommentGet, LecturerGet, LecturerGetAll, LecturerPatch, LecturerPost
-from rating_api.utils.mark import calc_weighted_mark
+from rating_api.schemas.models import (
+    CommentGet,
+    LecturerGet,
+    LecturerGetAll,
+    LecturerPatch,
+    LecturerPost,
+    LecturersFilter,
+    LecturerUpdateRatingPatch,
+    LecturerWithRank,
+)
 
 
 lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
@@ -35,17 +46,60 @@ async def create_lecturer(
     raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
 
+@lecturer.patch("/import_rating", response_model=LecturerUpdateRatingPatch)
+async def update_lecturer_rating(
+    lecturer_rank_info: list[LecturerWithRank],
+    _=Depends(UnionAuth(scopes=["rating.lecturer.update_rating"], allow_none=False, auto_error=True)),
+) -> LecturerUpdateRatingPatch:
+    """
+    Scopes: `["rating.lecturer.update_rating"]`
+
+    Обновляет рейтинг преподавателя в базе данных RatingAPI
+    """
+    updated_lecturers = []
+    response = {
+        "updated": 0,
+        "failed": 0,
+        "updated_id": [],
+        "failed_id": [],
+    }
+    for lecturer_rank in lecturer_rank_info:
+        success_fl = True
+        try:
+            LecturerWithRank.model_validate(lecturer_rank)
+        except ValidationException:
+            success_fl = False
+
+        lecturer_rank_dumped = lecturer_rank.model_dump()
+        lecturer_rank_dumped["rank_update_ts"] = datetime.datetime.now(tz=datetime.timezone.utc)
+
+        lecturer_id = lecturer_rank_dumped.pop("id")
+
+        if Lecturer.get(id=lecturer_id, session=db.session):
+            updated_lecturers.append(Lecturer.update(id=lecturer_id, session=db.session, **lecturer_rank_dumped))
+        else:
+            success_fl = False
+
+        if success_fl:
+            response["updated"] += 1
+            response["updated_id"].append(lecturer_id)
+        else:
+            response["failed"] += 1
+            response["failed_id"].append(lecturer_id)
+    response_validated = LecturerUpdateRatingPatch.model_validate(response)
+
+    return response_validated
+
+
 @lecturer.get("/{id}", response_model=LecturerGet)
-async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(default=[])) -> LecturerGet:
+async def get_lecturer(id: int, info: list[Literal["comments"]] = Query(default=[])) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.read"]`
 
     Возвращает преподавателя по его ID в базе данных RatingAPI
 
-    *QUERY* `info: string` - возможные значения `'comments'`, `'mark'`.
+    *QUERY* `info: string` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
-
     Subject лектора возвращшается либо из базы данных, либо из любого аппрувнутого комментария
     """
     lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.id == id).one_or_none()
@@ -61,14 +115,6 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
         ]
         if "comments" in info and approved_comments:
             result.comments = sorted(approved_comments, key=lambda comment: comment.create_ts, reverse=True)
-        if "mark" in info and approved_comments:
-            result.mark_freebie = sum(comment.mark_freebie for comment in approved_comments) / len(approved_comments)
-            result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(approved_comments)
-            result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(approved_comments)
-            result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(approved_comments)
-            result.mark_weighted = calc_weighted_mark(
-                result.mark_general, len(approved_comments), Lecturer.mean_mark_general()
-            )
         if approved_comments:
             result.subjects = list({comment.subject for comment in approved_comments})
     return result
@@ -76,16 +122,11 @@ async def get_lecturer(id: int, info: list[Literal["comments", "mark"]] = Query(
 
 @lecturer.get("", response_model=LecturerGetAll)
 async def get_lecturers(
+    lecturer_filter=FilterDepends(LecturersFilter),
     limit: int = 10,
     offset: int = 0,
-    info: list[Literal["comments", "mark"]] = Query(default=[]),
-    order_by: str = Query(
-        enum=["mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"],
-        default="mark_weighted",
-    ),
-    subject: str = Query(''),
-    name: str = Query(''),
-    asc_order: bool = False,
+    info: list[Literal["comments"]] = Query(default=[]),
+    mark: float = Query(default=None, ge=-2, le=2),
 ) -> LecturerGetAll:
     """
     `limit` - максимальное количество возвращаемых преподавателей
@@ -95,10 +136,16 @@ async def get_lecturers(
     `order_by` - возможные значения `"mark_weighted", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "last_name"`.
     Если передано `'last_name'` - возвращается список преподавателей отсортированных по алфавиту по фамилиям
     Если передано `'mark_...'` - возвращается список преподавателей отсортированных по конкретной оценке
+    Если передано просто так (или с '+' в начале параметра), то сортирует по возрастанию
+    С '-' в начале -- по убыванию.
 
-    `info` - возможные значения `'comments'`, `'mark'`.
+    *Пример запросов с этим параметром*:
+    - `...?order_by=-mark_kindness`
+    - `...?order_by=mark_freebie`
+    - `...?order_by=+mark_freebie` (эквивалентно 2ому пункту)
+
+    `info` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Если передано `'mark'`, то возвращаются общие средние оценки, а также суммарная средняя оценка по всем одобренным комментариям.
 
     `subject`
     Если передано `subject` - возвращает всех преподавателей, для которых переданное значение совпадает с одним из их предметов преподавания.
@@ -107,33 +154,18 @@ async def get_lecturers(
     `name`
     Поле для ФИО. Если передано `name` - возвращает всех преподователей, для которых нашлись совпадения с переданной строкой
 
-    `asc_order`
-    Если передано true, сортировать в порядке возрастания
-    Иначе - в порядке убывания
+    `mark`
+    Поле для оценки. Если передано, то возвращает только тех преподавателей, для которых средняя общая оценка ('general_mark')
+    больше, чем переданный 'mark'.
     """
-    lecturers_query = (
-        Lecturer.query(session=db.session)
-        .outerjoin(Lecturer.comments)
-        .group_by(Lecturer.id)
-        .filter(Lecturer.search_by_subject(subject))
-        .filter(Lecturer.search_by_name(name))
-        .order_by(
-            *(
-                Lecturer.order_by_mark(order_by, asc_order)
-                if "mark" in order_by
-                else Lecturer.order_by_name(order_by, asc_order)
-            )
-        )
+    lecturers_query = lecturer_filter.filter(
+        Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)
     )
-
+    lecturers_query = lecturer_filter.sort(lecturers_query)
     lecturers = lecturers_query.offset(offset).limit(limit).all()
     lecturers_count = lecturers_query.group_by(Lecturer.id).count()
 
-    if not lecturers:
-        raise ObjectNotFound(Lecturer, 'all')
     result = LecturerGetAll(limit=limit, offset=offset, total=lecturers_count)
-    if "mark" in info:
-        mean_mark_general = Lecturer.mean_mark_general()
     for db_lecturer in lecturers:
         lecturer_to_result: LecturerGet = LecturerGet.model_validate(db_lecturer)
         lecturer_to_result.comments = None
@@ -143,29 +175,21 @@ async def get_lecturers(
                 for comment in db_lecturer.comments
                 if comment.review_status is ReviewStatus.APPROVED
             ]
+            if (
+                mark is not None
+                and approved_comments
+                and sum(comment.mark_general for comment in approved_comments) / len(approved_comments) <= mark
+            ):
+                continue
             if "comments" in info and approved_comments:
                 lecturer_to_result.comments = sorted(
                     approved_comments, key=lambda comment: comment.create_ts, reverse=True
                 )
-            if "mark" in info and approved_comments:
-                lecturer_to_result.mark_freebie = sum([comment.mark_freebie for comment in approved_comments]) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_kindness = sum(comment.mark_kindness for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_clarity = sum(comment.mark_clarity for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_general = sum(comment.mark_general for comment in approved_comments) / len(
-                    approved_comments
-                )
-                lecturer_to_result.mark_weighted = calc_weighted_mark(
-                    lecturer_to_result.mark_general, len(approved_comments), mean_mark_general
-                )
             if approved_comments:
                 lecturer_to_result.subjects = list({comment.subject for comment in approved_comments})
         result.lecturers.append(lecturer_to_result)
+    if len(result.lecturers) == 0:
+        raise ObjectNotFound(Lecturer, 'all')
     return result
 
 
@@ -188,7 +212,7 @@ async def update_lecturer(
         .one_or_none()
     )
     if check_timetable_id:
-        raise AlreadyExists(Lecturer.timetable_id, lecturer_info.timetable_id)
+        raise AlreadyExists(Lecturer, lecturer_info.timetable_id)
 
     result = LecturerGet.model_validate(
         Lecturer.update(lecturer.id, **lecturer_info.model_dump(exclude_unset=True), session=db.session)

@@ -5,7 +5,6 @@ import logging
 import uuid
 from enum import Enum
 
-from fastapi_sqlalchemy import db
 from sqlalchemy import (
     UUID,
     Boolean,
@@ -13,6 +12,7 @@ from sqlalchemy import (
 )
 from sqlalchemy import Enum as DbEnum
 from sqlalchemy import (
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -30,8 +30,6 @@ from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
-from rating_api.utils.mark import calc_weighted_mark
-
 from .base import BaseDbModel
 
 
@@ -45,14 +43,43 @@ class ReviewStatus(str, Enum):
 
 
 class Lecturer(BaseDbModel):
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    first_name: Mapped[str] = mapped_column(String, nullable=False)
-    last_name: Mapped[str] = mapped_column(String, nullable=False)
-    middle_name: Mapped[str] = mapped_column(String, nullable=False)
-    avatar_link: Mapped[str] = mapped_column(String, nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Идентификатор преподавателя")
+    first_name: Mapped[str] = mapped_column(String, nullable=False, comment="Имя препода")
+    last_name: Mapped[str] = mapped_column(String, nullable=False, comment="Фамилия препода")
+    middle_name: Mapped[str] = mapped_column(String, nullable=False, comment="Отчество препода")
+    avatar_link: Mapped[str] = mapped_column(String, nullable=True, comment="Ссылка на аву препода")
     timetable_id: Mapped[int]
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
-    is_deleted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    mark_weighted: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default='0.0',
+        default=0,
+        comment="Взвешенная оценка преподавателя, посчитана в dwh",
+    )
+    mark_kindness_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка доброты, посчитана в dwh"
+    )
+    mark_clarity_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка понятности, посчитана в dwh"
+    )
+    mark_freebie_weighted: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка халявности, посчитана в dwh"
+    )
+    rank: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default='0', default=0, comment="Место в рейтинге, посчитана в dwh"
+    )
+    rank_update_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        server_default=func.now(),
+        default=datetime.datetime.now(),
+        comment="Время обновления записи",
+    )
+
+    is_deleted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, comment="Идентификатор софт делита"
+    )
 
     @hybrid_method
     def search_by_name(self, query: str) -> bool:
@@ -83,11 +110,15 @@ class Lecturer(BaseDbModel):
         self, query: str, asc_order: bool
     ) -> tuple[UnaryExpression[float], InstrumentedAttribute, InstrumentedAttribute]:
         if "mark_weighted" in query:
-            comments_num = func.count(self.comments).filter(Comment.review_status == ReviewStatus.APPROVED)
-            lecturer_mark_general = func.avg(Comment.mark_general).filter(
-                Comment.review_status == ReviewStatus.APPROVED
-            )
-            expression = calc_weighted_mark(lecturer_mark_general, comments_num, Lecturer.mean_mark_general())
+            expression = self.mark_weighted
+        elif "mark_clarity_weighted" in query:
+            expression = self.mark_clarity_weighted
+        elif "mark_freebie_weighted" in query:
+            expression = self.mark_freebie_weighted
+        elif "mark_kindness_weighted" in query:
+            expression = self.mark_kindness_weighted
+        elif "rank" in query:
+            expression = self.rank
         else:
             expression = func.avg(getattr(Comment, query)).filter(Comment.review_status == ReviewStatus.APPROVED)
         if not asc_order:
@@ -99,21 +130,6 @@ class Lecturer(BaseDbModel):
         self, query: str, asc_order: bool
     ) -> tuple[UnaryExpression[str] | InstrumentedAttribute, InstrumentedAttribute]:
         return (getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()), Lecturer.id
-
-    @staticmethod
-    def mean_mark_general() -> float:
-        mark_general_rows = (
-            db.session.query(func.avg(Comment.mark_general))
-            .filter(Comment.review_status == ReviewStatus.APPROVED)
-            .group_by(Comment.lecturer_id)
-            .all()
-        )
-        mean_mark_general = float(
-            sum(mark_general_row[0] for mark_general_row in mark_general_rows) / len(mark_general_rows)
-            if len(mark_general_rows) != 0
-            else 0
-        )
-        return mean_mark_general
 
 
 class Comment(BaseDbModel):
