@@ -49,7 +49,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     # Определяем дату, до которой учитываем комментарии для проверки общего лимита.
     cutoff_date_total = datetime.datetime(
         now.year + (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) // 12,
-        (now.month - settings.COMMENT_FREQUENCY_IN_MONTH) % 12,
+        (now.month - settings.COMMENT_FREQUENCY_IN_MONTH - 1) % 12 + 1,
         1,
     )
     total_user_comments_count = (
