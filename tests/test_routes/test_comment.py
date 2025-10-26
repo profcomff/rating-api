@@ -5,7 +5,7 @@ import uuid
 import pytest
 from starlette import status
 
-from rating_api.models import Comment, LecturerUserComment, ReviewStatus, Reaction, CommentReaction
+from rating_api.models import Comment, CommentReaction, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.settings import get_settings
 
 
@@ -204,15 +204,16 @@ def test_get_comment(client, comment):
     response = client.get(f'{url}/{random_uuid}')
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
+
 @pytest.fixture
 def comments_with_likes(client, dbsession, lecturers):
     """
     Создает несколько комментариев с разным количеством лайков/дизлайков
     """
     comments = []
-    
+
     user_id = 9999
-    
+
     comment_data = [
         {
             "user_id": user_id,
@@ -222,7 +223,7 @@ def comments_with_likes(client, dbsession, lecturers):
             "mark_kindness": 1,
             "mark_freebie": 0,
             "mark_clarity": 0,
-            "review_status": ReviewStatus.APPROVED
+            "review_status": ReviewStatus.APPROVED,
         },
         {
             "user_id": user_id,
@@ -232,7 +233,7 @@ def comments_with_likes(client, dbsession, lecturers):
             "mark_kindness": 1,
             "mark_freebie": 0,
             "mark_clarity": 0,
-            "review_status": ReviewStatus.APPROVED
+            "review_status": ReviewStatus.APPROVED,
         },
         {
             "user_id": user_id,
@@ -242,94 +243,64 @@ def comments_with_likes(client, dbsession, lecturers):
             "mark_kindness": 1,
             "mark_freebie": 0,
             "mark_clarity": 0,
-            "review_status": ReviewStatus.APPROVED
-        }
+            "review_status": ReviewStatus.APPROVED,
+        },
     ]
-    
+
     for data in comment_data:
         comment = Comment(**data)
         dbsession.add(comment)
         comments.append(comment)
-    
+
     dbsession.commit()
-    
 
     for _ in range(10):
-        reaction = CommentReaction(
-            comment_uuid=comments[0].uuid,
-            user_id=user_id,
-            reaction=Reaction.LIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[0].uuid, user_id=user_id, reaction=Reaction.LIKE)
         dbsession.add(reaction)
     for _ in range(2):
-        reaction = CommentReaction(
-            comment_uuid=comments[0].uuid,
-            user_id=user_id,
-            reaction=Reaction.DISLIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[0].uuid, user_id=user_id, reaction=Reaction.DISLIKE)
         dbsession.add(reaction)
-    
+
     for _ in range(3):
-        reaction = CommentReaction(
-            comment_uuid=comments[1].uuid,
-            user_id=user_id,
-            reaction=Reaction.LIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[1].uuid, user_id=user_id, reaction=Reaction.LIKE)
         dbsession.add(reaction)
     for _ in range(8):
-        reaction = CommentReaction(
-            comment_uuid=comments[1].uuid,
-            user_id=user_id,
-            reaction=Reaction.DISLIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[1].uuid, user_id=user_id, reaction=Reaction.DISLIKE)
         dbsession.add(reaction)
-    
+
     for _ in range(5):
-        reaction = CommentReaction(
-            comment_uuid=comments[2].uuid,
-            user_id=user_id,
-            reaction=Reaction.LIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[2].uuid, user_id=user_id, reaction=Reaction.LIKE)
         dbsession.add(reaction)
     for _ in range(5):
-        reaction = CommentReaction(
-            comment_uuid=comments[2].uuid,
-            user_id=user_id,
-            reaction=Reaction.DISLIKE
-        )
+        reaction = CommentReaction(comment_uuid=comments[2].uuid, user_id=user_id, reaction=Reaction.DISLIKE)
         dbsession.add(reaction)
-    
+
     dbsession.commit()
-    
+
     for comment in comments:
         dbsession.refresh(comment)
-    
+
     return comments
 
 
 @pytest.mark.parametrize(
     'order_by, asc_order',
     [
-        ('like_diff', False), 
-        ('like_diff', True),   
-    ]
+        ('like_diff', False),
+        ('like_diff', True),
+    ],
 )
 def test_comments_sort_by_like_diff(client, comments_with_likes, order_by, asc_order):
     """
     Тестирует сортировку комментариев по разнице лайков (like_diff)
     """
-    params = {
-        "order_by": order_by,
-        "asc_order": asc_order,
-        "limit": 10
-    }
-    
+    params = {"order_by": order_by, "asc_order": asc_order, "limit": 10}
+
     response = client.get('/comment', params=params)
     assert response.status_code == status.HTTP_200_OK
-    
+
     json_response = response.json()
     returned_comments = json_response["comments"]
-    
 
     if order_by == 'like_diff':
         if asc_order:
