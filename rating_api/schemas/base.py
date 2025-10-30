@@ -6,7 +6,7 @@ class Base(BaseModel):
         attrs = []
         for k, v in self.__class__.model_json_schema().items():
             attrs.append(f"{k}={v}")
-        return "{}({})".format(self.__class__.__name__, ', '.join(attrs))
+        return "{}({})".format(self.__class__.__name__, ", ".join(attrs))
 
     model_config = ConfigDict(from_attributes=True)
 

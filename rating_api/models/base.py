@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import re
 
+from rating_api.exceptions import ObjectNotFound, UpdateError
 from sqlalchemy import not_
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Query, Session, as_declarative, declared_attr
-
-from rating_api.exceptions import ObjectNotFound, UpdateError
 
 
 @as_declarative()
@@ -24,7 +23,7 @@ class Base:
         attrs = []
         for c in self.__table__.columns:
             attrs.append(f"{c.name}={getattr(self, c.name)}")
-        return "{}({})".format(c.__class__.__name__, ', '.join(attrs))
+        return "{}({})".format(c.__class__.__name__, ", ".join(attrs))
 
 
 class BaseDbModel(Base):
@@ -63,7 +62,7 @@ class BaseDbModel(Base):
         obj = cls.get(id, session=session)
 
         # Технические поля не проверяются при update комментария
-        technical_fields = {'update_ts', 'review_status'}
+        technical_fields = {"update_ts", "review_status"}
 
         # Проверка на изменение полей
         changed_fields = False

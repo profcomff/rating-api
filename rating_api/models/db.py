@@ -5,31 +5,15 @@ import logging
 import uuid
 from enum import Enum
 
-from sqlalchemy import (
-    UUID,
-    Boolean,
-    DateTime,
-)
+from sqlalchemy import UUID, Boolean, DateTime
 from sqlalchemy import Enum as DbEnum
-from sqlalchemy import (
-    Float,
-    ForeignKey,
-    Integer,
-    String,
-    UnaryExpression,
-    and_,
-    desc,
-    func,
-    nulls_last,
-    or_,
-    true,
-)
+from sqlalchemy import (Float, ForeignKey, Integer, String, UnaryExpression,
+                        and_, desc, func, nulls_last, or_, true)
 from sqlalchemy.ext.hybrid import hybrid_method, hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from .base import BaseDbModel
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,31 +25,57 @@ class ReviewStatus(str, Enum):
 
 
 class Lecturer(BaseDbModel):
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, comment="Идентификатор преподавателя")
-    first_name: Mapped[str] = mapped_column(String, nullable=False, comment="Имя препода")
-    last_name: Mapped[str] = mapped_column(String, nullable=False, comment="Фамилия препода")
-    middle_name: Mapped[str] = mapped_column(String, nullable=False, comment="Отчество препода")
-    avatar_link: Mapped[str] = mapped_column(String, nullable=True, comment="Ссылка на аву препода")
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, comment="Идентификатор преподавателя"
+    )
+    first_name: Mapped[str] = mapped_column(
+        String, nullable=False, comment="Имя препода"
+    )
+    last_name: Mapped[str] = mapped_column(
+        String, nullable=False, comment="Фамилия препода"
+    )
+    middle_name: Mapped[str] = mapped_column(
+        String, nullable=False, comment="Отчество препода"
+    )
+    avatar_link: Mapped[str] = mapped_column(
+        String, nullable=True, comment="Ссылка на аву препода"
+    )
     timetable_id: Mapped[int]
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
     mark_weighted: Mapped[float] = mapped_column(
         Float,
         nullable=False,
-        server_default='0.0',
+        server_default="0.0",
         default=0,
         comment="Взвешенная оценка преподавателя, посчитана в dwh",
     )
     mark_kindness_weighted: Mapped[float] = mapped_column(
-        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка доброты, посчитана в dwh"
+        Float,
+        nullable=False,
+        server_default="0.0",
+        default=0,
+        comment="Взвешенная оценка доброты, посчитана в dwh",
     )
     mark_clarity_weighted: Mapped[float] = mapped_column(
-        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка понятности, посчитана в dwh"
+        Float,
+        nullable=False,
+        server_default="0.0",
+        default=0,
+        comment="Взвешенная оценка понятности, посчитана в dwh",
     )
     mark_freebie_weighted: Mapped[float] = mapped_column(
-        Float, nullable=False, server_default='0.0', default=0, comment="Взвешенная оценка халявности, посчитана в dwh"
+        Float,
+        nullable=False,
+        server_default="0.0",
+        default=0,
+        comment="Взвешенная оценка халявности, посчитана в dwh",
     )
     rank: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default='0', default=0, comment="Место в рейтинге, посчитана в dwh"
+        Integer,
+        nullable=False,
+        server_default="0",
+        default=0,
+        comment="Место в рейтинге, посчитана в dwh",
     )
     rank_update_ts: Mapped[datetime.datetime] = mapped_column(
         DateTime,
@@ -82,7 +92,7 @@ class Lecturer(BaseDbModel):
     @hybrid_method
     def search_by_name(self, query: str) -> bool:
         response = true
-        query = query.split(' ')
+        query = query.split(" ")
         for q in query:
             q = q.lower()
             response = and_(
@@ -100,7 +110,10 @@ class Lecturer(BaseDbModel):
         query = query.lower()
         response = true
         if query:
-            response = and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
+            response = and_(
+                Comment.review_status == ReviewStatus.APPROVED,
+                func.lower(Comment.subject).contains(query),
+            )
         return response
 
     @hybrid_method
@@ -118,7 +131,9 @@ class Lecturer(BaseDbModel):
         elif "rank" in query:
             expression = self.rank
         else:
-            expression = func.avg(getattr(Comment, query)).filter(Comment.review_status == ReviewStatus.APPROVED)
+            expression = func.avg(getattr(Comment, query)).filter(
+                Comment.review_status == ReviewStatus.APPROVED
+            )
         if not asc_order:
             expression = expression.desc()
         return nulls_last(expression), Lecturer.last_name, Lecturer.id
@@ -127,14 +142,20 @@ class Lecturer(BaseDbModel):
     def order_by_name(
         self, query: str, asc_order: bool
     ) -> tuple[UnaryExpression[str] | InstrumentedAttribute, InstrumentedAttribute]:
-        return (getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()), Lecturer.id
+        return (
+            getattr(Lecturer, query) if asc_order else getattr(Lecturer, query).desc()
+        ), Lecturer.id
 
 
 class Comment(BaseDbModel):
     uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[int] = mapped_column(Integer, nullable=True)
-    create_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-    update_ts: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    create_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
+    update_ts: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.utcnow, nullable=False
+    )
     subject: Mapped[str] = mapped_column(String, nullable=True)
     text: Mapped[str] = mapped_column(String, nullable=True)
     mark_kindness: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -147,7 +168,9 @@ class Comment(BaseDbModel):
         back_populates="comments",
         primaryjoin="and_(Comment.lecturer_id == Lecturer.id, not_(Lecturer.is_deleted))",
     )
-    review_status: Mapped[ReviewStatus] = mapped_column(DbEnum(ReviewStatus, native_enum=False), nullable=False)
+    review_status: Mapped[ReviewStatus] = mapped_column(
+        DbEnum(ReviewStatus, native_enum=False), nullable=False
+    )
     reactions: Mapped[list[CommentReaction]] = relationship(
         "CommentReaction", back_populates="comment", cascade="all, delete-orphan"
     )
@@ -164,14 +187,18 @@ class Comment(BaseDbModel):
         return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
 
     @hybrid_method
-    def order_by_mark(self, query: str, asc_order: bool) -> UnaryExpression[float] | InstrumentedAttribute:
+    def order_by_mark(
+        self, query: str, asc_order: bool
+    ) -> UnaryExpression[float] | InstrumentedAttribute:
         return getattr(Comment, query) if asc_order else desc(getattr(Comment, query))
 
     @hybrid_method
     def search_by_lectorer_id(self, query: int) -> bool:
         if not query:
             return true()
-        return and_(Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query)
+        return and_(
+            Comment.review_status == ReviewStatus.APPROVED, Comment.lecturer_id == query
+        )
 
     @hybrid_method
     def search_by_user_id(self, query: int) -> bool:
@@ -183,17 +210,20 @@ class Comment(BaseDbModel):
     def search_by_subject(self, query: str) -> bool:
         if not query:
             return true()
-        return and_(Comment.review_status == ReviewStatus.APPROVED, func.lower(Comment.subject).contains(query))
+        return and_(
+            Comment.review_status == ReviewStatus.APPROVED,
+            func.lower(Comment.subject).contains(query),
+        )
 
     @hybrid_property
     def like_count(self) -> int:
         """Python access to like count"""
-        return sum(1 for like in self.reactions if like.reaction == 'like')
+        return sum(1 for like in self.reactions if like.reaction == "like")
 
     @hybrid_property
     def dislike_count(self) -> int:
         """Python access to dislike count"""
-        return sum(1 for like in self.reactions if like.reaction == 'dislike')
+        return sum(1 for like in self.reactions if like.reaction == "dislike")
 
 
 class LecturerUserComment(BaseDbModel):
@@ -216,14 +246,20 @@ class Reaction(str, Enum):
 
 class CommentReaction(BaseDbModel):
     uuid: Mapped[uuid.UUID] = mapped_column(UUID, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    comment_uuid: Mapped[UUID] = mapped_column(UUID, ForeignKey("comment.uuid"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False
+    )
+    comment_uuid: Mapped[UUID] = mapped_column(
+        UUID, ForeignKey("comment.uuid"), nullable=False
+    )
     reaction: Mapped[Reaction] = mapped_column(
         DbEnum(Reaction, native_enum=False), nullable=False
     )  # 1 for like, -1 for dislike
     created_at: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now(datetime.timezone.utc)
     )
-    edited_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    edited_at: Mapped[datetime.datetime] = mapped_column(
+        DateTime, default=datetime.datetime.now(datetime.timezone.utc)
+    )
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     comment = relationship("Comment", back_populates="reactions")

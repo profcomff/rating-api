@@ -7,7 +7,6 @@ import sys
 import requests
 from mistralai.client import MistralClient
 
-
 client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
 
 pr_number = os.environ.get("PR_NUMBER")
@@ -16,11 +15,16 @@ github_token = os.environ.get("GITHUB_TOKEN")
 
 base_sha = os.environ.get("BASE_SHA")
 head_sha = os.environ.get("HEAD_SHA")
-result = subprocess.run(f"git diff --name-only {base_sha} {head_sha}", shell=True, capture_output=True, text=True)
+result = subprocess.run(
+    f"git diff --name-only {base_sha} {head_sha}",
+    shell=True,
+    capture_output=True,
+    text=True,
+)
 files = [
     f
     for f in result.stdout.strip().split("\n")
-    if f.endswith(('.py', '.js', '.ts', '.go', '.java', '.cs', '.cpp', '.h', '.c'))
+    if f.endswith((".py", ".js", ".ts", ".go", ".java", ".cs", ".cpp", ".h", ".c"))
 ]
 
 if not files:
@@ -31,30 +35,30 @@ if not files:
 def parse_diff(diff_text):
     changes = []
     current_hunk = None
-    lines = diff_text.split('\n')
+    lines = diff_text.split("\n")
     file_path = None
 
     for line in lines:
-        if line.startswith('diff --git'):
-            file_path = line.split(' ')[2][2:]
+        if line.startswith("diff --git"):
+            file_path = line.split(" ")[2][2:]
 
-        elif line.startswith('@@'):
-            hunk_info = line.split('@@')[1].strip()
-            matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
+        elif line.startswith("@@"):
+            hunk_info = line.split("@@")[1].strip()
+            matches = re.match(r"-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?", hunk_info)
             if matches:
                 old_start = int(matches.group(1))
                 new_start = int(matches.group(2))
                 current_hunk = {
-                    'header': line,
-                    'old_start': old_start,
-                    'new_start': new_start,
-                    'lines': [],
-                    'context': hunk_info,
+                    "header": line,
+                    "old_start": old_start,
+                    "new_start": new_start,
+                    "lines": [],
+                    "context": hunk_info,
                 }
                 changes.append(current_hunk)
 
         elif current_hunk is not None:
-            current_hunk['lines'].append(line)
+            current_hunk["lines"].append(line)
 
     return changes
 
@@ -62,7 +66,7 @@ def parse_diff(diff_text):
 def parse_line_comments(review_text):
     line_comments = []
 
-    pattern = r'СТРОКА (\d+)(?:-(\d+))?: (.*?)(?=\nСТРОКА|\n\n|$)'
+    pattern = r"СТРОКА (\d+)(?:-(\d+))?: (.*?)(?=\nСТРОКА|\n\n|$)"
     matches = re.finditer(pattern, review_text, re.DOTALL)
 
     for match in matches:
@@ -70,27 +74,32 @@ def parse_line_comments(review_text):
         end_line = int(match.group(2)) if match.group(2) else start_line
         comment = match.group(3).strip()
 
-        line_comments.append({'start_line': start_line, 'end_line': end_line, 'comment': comment})
+        line_comments.append(
+            {"start_line": start_line, "end_line": end_line, "comment": comment}
+        )
 
     return line_comments
 
 
 def get_commit_id():
     commits_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/commits"
-    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
 
     response = requests.get(commits_url, headers=headers)
     if response.status_code == 200:
         commits = response.json()
         if commits:
-            return commits[-1]['sha']
+            return commits[-1]["sha"]
 
     return head_sha
 
 
 def extract_file_content(file_path):
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, "r", encoding="utf-8") as f:
             return f.readlines()
     except Exception as e:
         print(f"Ошибка при чтении файла {file_path}: {e}")
@@ -98,21 +107,23 @@ def extract_file_content(file_path):
 
 
 def get_diff_hunk_for_position(patch, position):
-    lines = patch.split('\n')
+    lines = patch.split("\n")
     if 0 <= position < len(lines):
         start_idx = position
-        while start_idx > 0 and not lines[start_idx].startswith('@@'):
+        while start_idx > 0 and not lines[start_idx].startswith("@@"):
             start_idx -= 1
 
-        if start_idx < 0 or not lines[start_idx].startswith('@@'):
+        if start_idx < 0 or not lines[start_idx].startswith("@@"):
             return None
 
         end_idx = position
-        while end_idx < len(lines) and not (end_idx > position and lines[end_idx].startswith('@@')):
+        while end_idx < len(lines) and not (
+            end_idx > position and lines[end_idx].startswith("@@")
+        ):
             end_idx += 1
 
         hunk_lines = lines[start_idx:end_idx]
-        return '\n'.join(hunk_lines)
+        return "\n".join(hunk_lines)
 
     return None
 
@@ -121,7 +132,7 @@ def validate_position(patch, position):
     if position <= 0:
         return False
 
-    lines = patch.split('\n')
+    lines = patch.split("\n")
     if position >= len(lines):
         return False
 
@@ -129,28 +140,30 @@ def validate_position(patch, position):
     if not diff_hunk:
         return False
 
-    if position < len(lines) and lines[position].startswith('-'):
+    if position < len(lines) and lines[position].startswith("-"):
         return False
 
     return True
 
 
 def find_position_by_content(patch, content, line_num, vicinity=2):
-    lines = patch.split('\n')
+    lines = patch.split("\n")
     content = content.strip()
 
     if not content:
         return None
 
     for i, line in enumerate(lines):
-        if (line.startswith('+') or line.startswith(' ')) and content in line.strip():
+        if (line.startswith("+") or line.startswith(" ")) and content in line.strip():
             if get_diff_hunk_for_position(patch, i):
                 return i
 
     for i, line in enumerate(lines):
-        if line.startswith('+') or line.startswith(' '):
+        if line.startswith("+") or line.startswith(" "):
             content_parts = content.split()
-            if content_parts and any(part in line for part in content_parts if len(part) > 3):
+            if content_parts and any(
+                part in line for part in content_parts if len(part) > 3
+            ):
                 if get_diff_hunk_for_position(patch, i):
                     return i
 
@@ -160,7 +173,10 @@ def find_position_by_content(patch, content, line_num, vicinity=2):
 def create_review_with_comments(file_comments, commit_id):
     """Создает ревью с комментариями к конкретным строкам кода"""
     review_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews"
-    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Authorization": f"token {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
 
     pr_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     pr_response = requests.get(pr_url, headers=headers)
@@ -174,7 +190,7 @@ def create_review_with_comments(file_comments, commit_id):
 
     if files_response.status_code == 200:
         for file_info in files_response.json():
-            pr_files[file_info['filename']] = file_info
+            pr_files[file_info["filename"]] = file_info
 
     review_comments = []
     total_comments = 0
@@ -184,19 +200,21 @@ def create_review_with_comments(file_comments, commit_id):
     file_diff_hunks = {}
 
     for file_path, file_info in pr_files.items():
-        patch = file_info.get('patch', '')
+        patch = file_info.get("patch", "")
 
         if patch:
-            lines = patch.split('\n')
+            lines = patch.split("\n")
             if len(lines) > 0:
                 file_first_positions[file_path] = 1
 
                 for i, line in enumerate(lines):
-                    if line.startswith('+'):
+                    if line.startswith("+"):
                         file_first_positions[file_path] = i + 1
                         break
 
-                file_diff_hunks[file_path] = get_diff_hunk_for_position(patch, file_first_positions[file_path])
+                file_diff_hunks[file_path] = get_diff_hunk_for_position(
+                    patch, file_first_positions[file_path]
+                )
         else:
             file_first_positions[file_path] = 1
             file_diff_hunks[file_path] = None
@@ -209,23 +227,36 @@ def create_review_with_comments(file_comments, commit_id):
             print(f"Файл {file_path} не найден в PR")
             continue
 
-        patch = pr_files[file_path].get('patch', '')
+        patch = pr_files[file_path].get("patch", "")
 
         if not patch:
-            print(f"Отсутствует patch для файла {file_path}, добавляем комментарии в общий список")
+            print(
+                f"Отсутствует patch для файла {file_path}, добавляем комментарии в общий список"
+            )
             file_level_comments = []
             for comment in comments:
-                file_level_comments.append(f"**Комментарий к строке {comment['start_line']}**: {comment['comment']}")
+                file_level_comments.append(
+                    f"**Комментарий к строке {comment['start_line']}**: {comment['comment']}"
+                )
 
             if file_level_comments:
-                review_comments.append({"path": file_path, "position": 1, "body": "\n\n".join(file_level_comments)})
+                review_comments.append(
+                    {
+                        "path": file_path,
+                        "position": 1,
+                        "body": "\n\n".join(file_level_comments),
+                    }
+                )
                 placed_comments += 1
             continue
 
-        pr_files[file_path]['parsed_patch'] = patch
+        pr_files[file_path]["parsed_patch"] = patch
 
         diff_result = subprocess.run(
-            f"git diff {base_sha} {head_sha} -- {file_path}", shell=True, capture_output=True, text=True
+            f"git diff {base_sha} {head_sha} -- {file_path}",
+            shell=True,
+            capture_output=True,
+            text=True,
         )
         full_diff = diff_result.stdout
 
@@ -236,41 +267,43 @@ def create_review_with_comments(file_comments, commit_id):
         line_position_map_git = {}
         line_num = 0
         position = 0
-        for line in full_diff.split('\n'):
+        for line in full_diff.split("\n"):
             position += 1
 
-            if line.startswith('@@'):
-                hunk_info = line.split('@@')[1].strip()
-                matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', hunk_info)
+            if line.startswith("@@"):
+                hunk_info = line.split("@@")[1].strip()
+                matches = re.match(r"-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?", hunk_info)
                 if matches:
                     line_num = int(matches.group(2)) - 1
 
-            if line.startswith('+'):
+            if line.startswith("+"):
                 line_num += 1
                 line_position_map_git[line_num] = position
-            elif line.startswith(' '):
+            elif line.startswith(" "):
                 line_num += 1
 
-        line_position_maps['git'] = line_position_map_git
+        line_position_maps["git"] = line_position_map_git
 
         line_position_map_api = {}
         line_num = 0
         position = 0
-        for line in patch.split('\n'):
+        for line in patch.split("\n"):
             position += 1
 
-            if line.startswith('@@'):
-                matches = re.match(r'-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?', line.split('@@')[1].strip())
+            if line.startswith("@@"):
+                matches = re.match(
+                    r"-(\d+)(?:,\d+)? \+(\d+)(?:,\d+)?", line.split("@@")[1].strip()
+                )
                 if matches:
                     line_num = int(matches.group(2)) - 1
 
-            if line.startswith('+'):
+            if line.startswith("+"):
                 line_num += 1
                 line_position_map_api[line_num] = position
-            elif line.startswith(' '):
+            elif line.startswith(" "):
                 line_num += 1
 
-        line_position_maps['api'] = line_position_map_api
+        line_position_maps["api"] = line_position_map_api
 
         line_content_map = {}
         if file_content:
@@ -278,7 +311,7 @@ def create_review_with_comments(file_comments, commit_id):
                 line_content_map[i + 1] = line.strip()
 
         position_hunk_map = {}
-        for pos in range(len(patch.split('\n'))):
+        for pos in range(len(patch.split("\n"))):
             hunk = get_diff_hunk_for_position(patch, pos)
             if hunk:
                 position_hunk_map[pos] = hunk
@@ -289,9 +322,9 @@ def create_review_with_comments(file_comments, commit_id):
         valid_positions = set()
         position_hunk_mapping = {}
 
-        lines = patch.split('\n')
+        lines = patch.split("\n")
         for pos, line in enumerate(lines):
-            if not line.startswith('-'):
+            if not line.startswith("-"):
                 if validate_position(patch, pos):
                     valid_positions.add(pos)
                     hunk = get_diff_hunk_for_position(patch, pos)
@@ -299,8 +332,8 @@ def create_review_with_comments(file_comments, commit_id):
                         position_hunk_mapping[pos] = hunk
 
         for comment in comments:
-            start_line = comment['start_line']
-            comment_body = comment['comment']
+            start_line = comment["start_line"]
+            comment_body = comment["comment"]
             position_found = False
             position = None
             diff_hunk = None
@@ -321,7 +354,11 @@ def create_review_with_comments(file_comments, commit_id):
                             f"Найдена позиция {position} для строки {start_line} в карте {map_name}, но она невалидна"
                         )
 
-            if not position_found and file_content and 0 < start_line <= len(file_content):
+            if (
+                not position_found
+                and file_content
+                and 0 < start_line <= len(file_content)
+            ):
                 target_line = file_content[start_line - 1].rstrip()
                 context_line = target_line.strip()
 
@@ -344,7 +381,9 @@ def create_review_with_comments(file_comments, commit_id):
 
                     for i, context in enumerate(context_lines):
                         if context and offset != 0:
-                            position = find_position_by_content(patch, context, start_line - 5 + i)
+                            position = find_position_by_content(
+                                patch, context, start_line - 5 + i
+                            )
                             if position is not None and position in valid_positions:
                                 diff_hunk = position_hunk_mapping.get(position)
                                 if diff_hunk:
@@ -357,7 +396,7 @@ def create_review_with_comments(file_comments, commit_id):
                 if not position_found and valid_positions:
                     nearest_line = None
                     nearest_position = None
-                    min_distance = float('inf')
+                    min_distance = float("inf")
 
                     for line_num, pos in line_position_map_api.items():
                         if pos in valid_positions:
@@ -382,21 +421,32 @@ def create_review_with_comments(file_comments, commit_id):
                     if diff_hunk:
                         position = pos
                         position_found = True
-                        print(f"Используем первую валидную позицию {position} для строки {start_line} с diff_hunk")
+                        print(
+                            f"Используем первую валидную позицию {position} для строки {start_line} с diff_hunk"
+                        )
                         break
 
             if position_found and position is not None and diff_hunk:
                 review_comments.append(
-                    {"path": file_path, "position": position, "body": comment_body, "diff_hunk": diff_hunk}
+                    {
+                        "path": file_path,
+                        "position": position,
+                        "body": comment_body,
+                        "diff_hunk": diff_hunk,
+                    }
                 )
                 placed_comments += 1
                 file_comments_added += 1
-                print(f"✅ Успешно определена позиция {position} с diff_hunk для строки {start_line}")
+                print(
+                    f"✅ Успешно определена позиция {position} с diff_hunk для строки {start_line}"
+                )
             else:
                 print(
                     f"❌ Не удалось определить валидную позицию для строки {start_line} в файле {file_path}, добавлен комментарий к файлу"
                 )
-                file_level_comments.append(f"**Комментарий к строке {start_line}**: {comment_body}")
+                file_level_comments.append(
+                    f"**Комментарий к строке {start_line}**: {comment_body}"
+                )
 
         if file_level_comments:
             if file_comments_added == 0:
@@ -406,7 +456,8 @@ def create_review_with_comments(file_comments, commit_id):
                 comment_data = {
                     "path": file_path,
                     "position": first_position,
-                    "body": "# Комментарии к файлу\n\n" + "\n\n".join(file_level_comments),
+                    "body": "# Комментарии к файлу\n\n"
+                    + "\n\n".join(file_level_comments),
                 }
 
                 if first_hunk:
@@ -418,7 +469,9 @@ def create_review_with_comments(file_comments, commit_id):
                 for comment in review_comments:
                     if comment["path"] == file_path:
                         comment["body"] = (
-                            comment["body"] + "\n\n# Дополнительные комментарии\n\n" + "\n\n".join(file_level_comments)
+                            comment["body"]
+                            + "\n\n# Дополнительные комментарии\n\n"
+                            + "\n\n".join(file_level_comments)
                         )
                         break
 
@@ -432,22 +485,36 @@ def create_review_with_comments(file_comments, commit_id):
     valid_review_comments = []
     for comment in review_comments:
 
-        if "path" not in comment or "position" not in comment or comment["position"] is None:
+        if (
+            "path" not in comment
+            or "position" not in comment
+            or comment["position"] is None
+        ):
             print(
                 f"Пропускаем невалидный комментарий к файлу {comment.get('path', 'неизвестный')}: отсутствует позиция"
             )
             continue
 
         if comment["path"] not in pr_files:
-            print(f"Пропускаем невалидный комментарий к файлу {comment['path']}: файл не найден в PR")
+            print(
+                f"Пропускаем невалидный комментарий к файлу {comment['path']}: файл не найден в PR"
+            )
             continue
 
-        if "diff_hunk" not in comment and comment["path"] in pr_files and pr_files[comment["path"]].get('patch'):
-            hunk = get_diff_hunk_for_position(pr_files[comment["path"]]['parsed_patch'], comment["position"])
+        if (
+            "diff_hunk" not in comment
+            and comment["path"] in pr_files
+            and pr_files[comment["path"]].get("patch")
+        ):
+            hunk = get_diff_hunk_for_position(
+                pr_files[comment["path"]]["parsed_patch"], comment["position"]
+            )
             if hunk:
                 comment["diff_hunk"] = hunk
             else:
-                print(f"Пропускаем комментарий к файлу {comment['path']}: не удалось найти diff_hunk")
+                print(
+                    f"Пропускаем комментарий к файлу {comment['path']}: не удалось найти diff_hunk"
+                )
                 continue
 
         if "diff_hunk" in comment:
@@ -456,55 +523,85 @@ def create_review_with_comments(file_comments, commit_id):
         valid_review_comments.append(comment)
 
     if not valid_review_comments:
-        print("После валидации не осталось валидных комментариев, создаем общий комментарий")
+        print(
+            "После валидации не осталось валидных комментариев, создаем общий комментарий"
+        )
         summary = "# Комментарии к коду\n\n"
 
         for file_path, comments in file_comments.items():
             summary += f"## Файл: {file_path}\n\n"
             for comment in comments:
-                summary += f"**Строка {comment['start_line']}**: {comment['comment']}\n\n"
+                summary += (
+                    f"**Строка {comment['start_line']}**: {comment['comment']}\n\n"
+                )
             summary += "---\n\n"
 
         review_data = {"commit_id": commit_id, "event": "COMMENT", "body": summary}
 
         response = requests.post(
-            f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews", headers=headers, json=review_data
+            f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+            headers=headers,
+            json=review_data,
         )
 
         if response.status_code not in [200, 201]:
-            print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+            print(
+                f"Ошибка при создании общего комментария: {response.status_code} - {response.text}"
+            )
             return False
         else:
             print("Общий комментарий к PR успешно создан.")
             return True
 
-    review_data = {"commit_id": commit_id, "event": "COMMENT", "comments": valid_review_comments}
+    review_data = {
+        "commit_id": commit_id,
+        "event": "COMMENT",
+        "comments": valid_review_comments,
+    }
 
-    print(f"Отправляем запрос на создание ревью с {len(valid_review_comments)} комментариями")
+    print(
+        f"Отправляем запрос на создание ревью с {len(valid_review_comments)} комментариями"
+    )
     for i, comment in enumerate(valid_review_comments):
-        print(f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}")
+        print(
+            f"Комментарий {i+1}: файл={comment['path']}, позиция={comment['position']}"
+        )
 
     if len(valid_review_comments) > 3:
-        print("Много комментариев, отправляем по одному для увеличения вероятности успеха")
+        print(
+            "Много комментариев, отправляем по одному для увеличения вероятности успеха"
+        )
         successful_comments = 0
         failed_comments = []
 
         for i, comment in enumerate(valid_review_comments):
-            single_review_data = {"commit_id": commit_id, "event": "COMMENT", "comments": [comment]}
+            single_review_data = {
+                "commit_id": commit_id,
+                "event": "COMMENT",
+                "comments": [comment],
+            }
 
-            single_response = requests.post(review_url, headers=headers, json=single_review_data)
+            single_response = requests.post(
+                review_url, headers=headers, json=single_review_data
+            )
             if single_response.status_code in [200, 201]:
                 successful_comments += 1
                 print(f"Успешно создан комментарий {i+1}/{len(valid_review_comments)}")
             else:
                 failed_comments.append(comment)
-                print(f"Ошибка при создании комментария {i+1}: {single_response.status_code} - {single_response.text}")
+                print(
+                    f"Ошибка при создании комментария {i+1}: {single_response.status_code} - {single_response.text}"
+                )
 
         if successful_comments > 0:
-            print(f"Успешно создано {successful_comments} из {len(valid_review_comments)} комментариев")
+            print(
+                f"Успешно создано {successful_comments} из {len(valid_review_comments)} комментариев"
+            )
 
             if failed_comments:
-                print(f"Создаем общий комментарий для {len(failed_comments)} неудачных комментариев")
+                print(
+                    f"Создаем общий комментарий для {len(failed_comments)} неудачных комментариев"
+                )
                 summary = "# Дополнительные комментарии\n\n"
 
                 for comment in failed_comments:
@@ -512,7 +609,11 @@ def create_review_with_comments(file_comments, commit_id):
                     body = comment.get("body", "")
                     summary += f"## Файл: {file_path}\n\n{body}\n\n---\n\n"
 
-                review_data = {"commit_id": commit_id, "event": "COMMENT", "body": summary}
+                review_data = {
+                    "commit_id": commit_id,
+                    "event": "COMMENT",
+                    "body": summary,
+                }
 
                 response = requests.post(
                     f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
@@ -525,7 +626,9 @@ def create_review_with_comments(file_comments, commit_id):
                         f"Ошибка при создании общего комментария для неудачных комментариев: {response.status_code} - {response.text}"
                     )
                 else:
-                    print("Общий комментарий для неудачных комментариев успешно создан.")
+                    print(
+                        "Общий комментарий для неудачных комментариев успешно создан."
+                    )
 
             return True
         else:
@@ -546,7 +649,9 @@ def create_review_with_comments(file_comments, commit_id):
             )
 
             if response.status_code not in [200, 201]:
-                print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+                print(
+                    f"Ошибка при создании общего комментария: {response.status_code} - {response.text}"
+                )
                 return False
             else:
                 print("Общий комментарий к PR успешно создан.")
@@ -554,7 +659,9 @@ def create_review_with_comments(file_comments, commit_id):
     else:
         response = requests.post(review_url, headers=headers, json=review_data)
         if response.status_code not in [200, 201]:
-            print(f"Ошибка при создании ревью: {response.status_code} - {response.text}")
+            print(
+                f"Ошибка при создании ревью: {response.status_code} - {response.text}"
+            )
 
             print("Пробуем создать общий комментарий к PR...")
             summary = "# Комментарии к коду\n\n"
@@ -573,7 +680,9 @@ def create_review_with_comments(file_comments, commit_id):
             )
 
             if response.status_code not in [200, 201]:
-                print(f"Ошибка при создании общего комментария: {response.status_code} - {response.text}")
+                print(
+                    f"Ошибка при создании общего комментария: {response.status_code} - {response.text}"
+                )
                 return False
             else:
                 print("Общий комментарий к PR успешно создан.")
@@ -593,7 +702,10 @@ for file_path in files:
         continue
 
     diff_result = subprocess.run(
-        f"git diff {base_sha} {head_sha} -- {file_path}", shell=True, capture_output=True, text=True
+        f"git diff {base_sha} {head_sha} -- {file_path}",
+        shell=True,
+        capture_output=True,
+        text=True,
     )
     diff = diff_result.stdout
 
@@ -704,7 +816,9 @@ else:
 """
 
     try:
-        chat_response = client.chat(model="mistral-large-latest", messages=[{"role": "user", "content": prompt}])
+        chat_response = client.chat(
+            model="mistral-large-latest", messages=[{"role": "user", "content": prompt}]
+        )
 
         review_text = chat_response.choices[0].message.content
 

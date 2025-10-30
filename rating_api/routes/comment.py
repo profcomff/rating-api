@@ -7,37 +7,29 @@ import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-
-from rating_api.exceptions import (
-    CommentTooLong,
-    ForbiddenAction,
-    ForbiddenSymbol,
-    ObjectNotFound,
-    TooManyCommentRequests,
-    TooManyCommentsToLecturer,
-)
-from rating_api.models import Comment, CommentReaction, Lecturer, LecturerUserComment, Reaction, ReviewStatus
+from rating_api.exceptions import (CommentTooLong, ForbiddenAction,
+                                   ForbiddenSymbol, ObjectNotFound,
+                                   TooManyCommentRequests,
+                                   TooManyCommentsToLecturer)
+from rating_api.models import (Comment, CommentReaction, Lecturer,
+                               LecturerUserComment, Reaction, ReviewStatus)
 from rating_api.schemas.base import StatusResponseModel
-from rating_api.schemas.models import (
-    CommentGet,
-    CommentGetAll,
-    CommentGetAllWithAllInfo,
-    CommentGetAllWithStatus,
-    CommentGetWithAllInfo,
-    CommentGetWithStatus,
-    CommentImportAll,
-    CommentPost,
-    CommentUpdate,
-)
+from rating_api.schemas.models import (CommentGet, CommentGetAll,
+                                       CommentGetAllWithAllInfo,
+                                       CommentGetAllWithStatus,
+                                       CommentGetWithAllInfo,
+                                       CommentGetWithStatus, CommentImportAll,
+                                       CommentPost, CommentUpdate)
 from rating_api.settings import Settings, get_settings
-
 
 settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
+async def create_comment(
+    lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())
+) -> CommentGet:
     """
     Создает комментарий к преподавателю в базе данных RatingAPI
     Для создания комментария нужно быть авторизованным
@@ -61,7 +53,9 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
         .count()
     )
     if total_user_comments_count >= settings.COMMENT_LIMIT:
-        raise TooManyCommentRequests(settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT)
+        raise TooManyCommentRequests(
+            settings.COMMENT_FREQUENCY_IN_MONTH, settings.COMMENT_LIMIT
+        )
 
     # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
     cutoff_date_lecturer = datetime.datetime(
@@ -80,13 +74,20 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     )
     if lecturer_user_comments_count >= settings.COMMENT_TO_LECTURER_LIMIT:
         raise TooManyCommentsToLecturer(
-            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH, settings.COMMENT_TO_LECTURER_LIMIT
+            settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH,
+            settings.COMMENT_TO_LECTURER_LIMIT,
         )
 
     if len(comment_info.text) > settings.MAX_COMMENT_LENGTH:
         raise CommentTooLong(settings.MAX_COMMENT_LENGTH)
 
-    if re.search(r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$", comment_info.text) is None:
+    if (
+        re.search(
+            r"^[a-zA-Zа-яА-Я\d!?,_\-.\"\'\[\]{}`~<>^@#№$%;:&*()+=\\\/ \n]*$",
+            comment_info.text,
+        )
+        is None
+    ):
         raise ForbiddenSymbol()
 
     # Сначала добавляем с user_id, который мы получили при авторизации,
@@ -95,12 +96,12 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     LecturerUserComment.create(
         session=db.session,
         lecturer_id=lecturer_id,
-        user_id=user.get('id'),
+        user_id=user.get("id"),
         create_ts=create_ts,
         update_ts=create_ts,
     )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
-    user_id = None if comment_info.is_anonymous else user.get('id')
+    user_id = None if comment_info.is_anonymous else user.get("id")
 
     new_comment = Comment.create(
         session=db.session,
@@ -129,22 +130,28 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
             session.post(
                 settings.API_URL
                 + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
-                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN,
+                },
             )
 
     return CommentGet.model_validate(new_comment)
 
 
-@comment.post('/import', response_model=CommentGetAll)
+@comment.post("/import", response_model=CommentGetAll)
 async def import_comments(
-    comments_info: CommentImportAll, _=Depends(UnionAuth(scopes=["rating.comment.import"]))
+    comments_info: CommentImportAll,
+    _=Depends(UnionAuth(scopes=["rating.comment.import"])),
 ) -> CommentGetAll:
     """
     Scopes: `["rating.comment.import"]`
     Создает комментарии в базе данных RatingAPI
     """
     number_of_comments = len(comments_info.comments)
-    result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
+    result = CommentGetAll(
+        limit=number_of_comments, offset=number_of_comments, total=number_of_comments
+    )
     for comment_info in comments_info.comments:
         new_comment = Comment.create(
             session=db.session,
@@ -160,13 +167,20 @@ async def get_comment(uuid: UUID) -> CommentGet:
     """
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
-    comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    comment: Comment = (
+        Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    )
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
     return CommentGet.model_validate(comment)
 
 
-@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
+@comment.get(
+    "",
+    response_model=Union[
+        CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus
+    ],
+)
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -174,12 +188,20 @@ async def get_comments(
     user_id: int | None = None,
     subject: str | None = None,
     order_by: str = Query(
-        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general"],
+        enum=[
+            "create_ts",
+            "mark_kindness",
+            "mark_freebie",
+            "mark_clarity",
+            "mark_general",
+        ],
         default="create_ts",
     ),
     unreviewed: bool = False,
     asc_order: bool = False,
-    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)),
+    user=Depends(
+        UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)
+    ),
 ) -> CommentGetAll:
     """
      Scopes: `["rating.comment.review"]`
@@ -215,12 +237,18 @@ async def get_comments(
     )
     comments = comments_query.limit(limit).offset(offset).all()
     if not comments:
-        raise ObjectNotFound(Comment, 'all')
-    if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-        result = CommentGetAllWithAllInfo(limit=limit, offset=offset, total=len(comments))
+        raise ObjectNotFound(Comment, "all")
+    if user and "rating.comment.review" in [
+        scope["name"] for scope in user.get("session_scopes")
+    ]:
+        result = CommentGetAllWithAllInfo(
+            limit=limit, offset=offset, total=len(comments)
+        )
         comment_validator = CommentGetWithAllInfo
-    elif user and user.get('id') == user_id:
-        result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
+    elif user and user.get("id") == user_id:
+        result = CommentGetAllWithStatus(
+            limit=limit, offset=offset, total=len(comments)
+        )
         comment_validator = CommentGetWithStatus
     else:
         result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
@@ -231,15 +259,27 @@ async def get_comments(
     if unreviewed:
         if not user:
             raise ForbiddenAction(Comment)
-        if "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
-            result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.PENDING]
+        if "rating.comment.review" in [
+            scope["name"] for scope in user.get("session_scopes")
+        ]:
+            result.comments = [
+                comment
+                for comment in result.comments
+                if comment.review_status is ReviewStatus.PENDING
+            ]
         else:
             raise ForbiddenAction(Comment)
     else:
-        result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
+        result.comments = [
+            comment
+            for comment in result.comments
+            if comment.review_status is ReviewStatus.APPROVED
+        ]
 
     result.total = len(result.comments)
-    result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
+    result.comments = [
+        comment_validator.model_validate(comment) for comment in result.comments
+    ]
 
     return result
 
@@ -247,8 +287,12 @@ async def get_comments(
 @comment.patch("/{uuid}/review", response_model=CommentGetWithAllInfo)
 async def review_comment(
     uuid: UUID,
-    user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)),
-    review_status: Literal[ReviewStatus.APPROVED, ReviewStatus.DISMISSED] = ReviewStatus.DISMISSED,
+    user=Depends(
+        UnionAuth(scopes=["rating.comment.review"], auto_error=True, allow_none=True)
+    ),
+    review_status: Literal[
+        ReviewStatus.APPROVED, ReviewStatus.DISMISSED
+    ] = ReviewStatus.DISMISSED,
 ) -> CommentGetWithAllInfo:
     """
     Scopes: `["rating.comment.review"]`
@@ -258,20 +302,31 @@ async def review_comment(
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
     """
-    check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    check_comment: Comment = (
+        Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
+    )
 
     if not check_comment:
         raise ObjectNotFound(Comment, uuid)
 
     return CommentGetWithAllInfo.model_validate(
-        Comment.update(session=db.session, id=uuid, review_status=review_status, approved_by=user.get("id"))
+        Comment.update(
+            session=db.session,
+            id=uuid,
+            review_status=review_status,
+            approved_by=user.get("id"),
+        )
     )
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)
-async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+async def update_comment(
+    uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())
+) -> CommentGet:
     """Позволяет изменить свой неанонимный комментарий"""
-    comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
+    comment: Comment = Comment.get(
+        session=db.session, id=uuid
+    )  # Ошибка, если не найден
 
     if comment.user_id != user.get("id") or comment.user_id is None:
         raise ForbiddenAction(Comment)
@@ -305,15 +360,21 @@ async def delete_comment(
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
     # Наличие скоупа для удаления любых комментариев
-    has_delete_scope = "rating.comment.delete" in [scope['name'] for scope in user.get('session_scopes')]
+    has_delete_scope = "rating.comment.delete" in [
+        scope["name"] for scope in user.get("session_scopes")
+    ]
 
     # Если нет привилегии - проверяем права обычного пользователя
-    if not has_delete_scope and (comment.user_id == None or comment.user_id != user.get('id')):
+    if not has_delete_scope and (
+        comment.user_id == None or comment.user_id != user.get("id")
+    ):
         raise ForbiddenAction(Comment)
     Comment.delete(session=db.session, id=uuid)
 
     return StatusResponseModel(
-        status="Success", message="Comment has been deleted", ru="Комментарий удален из RatingAPI"
+        status="Success",
+        message="Comment has been deleted",
+        ru="Комментарий удален из RatingAPI",
     )
 
 
@@ -355,9 +416,16 @@ async def like_comment(
     )
 
     if existing_reaction and existing_reaction.reaction != reaction:
-        new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)
+        new_reaction = CommentReaction.update(
+            session=db.session, id=existing_reaction.uuid, reaction=reaction
+        )
     elif not existing_reaction:
-        CommentReaction.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, reaction=reaction)
+        CommentReaction.create(
+            session=db.session,
+            user_id=user.get("id"),
+            comment_uuid=comment.uuid,
+            reaction=reaction,
+        )
     else:
         CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
     return CommentGet.model_validate(comment)

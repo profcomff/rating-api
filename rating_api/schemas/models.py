@@ -5,7 +5,6 @@ from uuid import UUID
 from fastapi import Query
 from fastapi_filter.contrib.sqlalchemy import Filter
 from pydantic import ValidationInfo, field_validator
-
 from rating_api.exceptions import WrongMark
 from rating_api.models import Lecturer, ReviewStatus
 from rating_api.schemas.base import Base
@@ -43,7 +42,7 @@ class CommentUpdate(Base):
     mark_freebie: int = None
     mark_clarity: int = None
 
-    @field_validator('mark_kindness', 'mark_freebie', 'mark_clarity')
+    @field_validator("mark_kindness", "mark_freebie", "mark_clarity")
     @classmethod
     def validate_mark(cls, value):
         if value not in [-2, -1, 0, 1, 2]:
@@ -147,17 +146,17 @@ class LecturerPatch(LecturerPost):
 
 
 class LecturersFilter(Filter):
-    subject: str = ''
-    name: str = ''
+    subject: str = ""
+    name: str = ""
     order_by: List[str] = [
-        'mark_weighted',
+        "mark_weighted",
     ]
 
     @field_validator("*", mode="before", check_fields=False)
     def validate_order_by(cls, value, field: ValidationInfo):
         return value
 
-    @field_validator('order_by', mode='before')
+    @field_validator("order_by", mode="before")
     def check_order_param(cls, value: str) -> str:
         """Проверяет, что значение поля (без +/-) входит в список возможных."""
         allowed_ordering = {
@@ -172,7 +171,9 @@ class LecturersFilter(Filter):
         if cleaned_value in allowed_ordering:
             return value
         else:
-            raise ValueError(f'"order_by"-field must contain value from {allowed_ordering}.')
+            raise ValueError(
+                f'"order_by"-field must contain value from {allowed_ordering}.'
+            )
 
     def filter(self, query: Query) -> Query:
         if self.subject:
@@ -185,17 +186,23 @@ class LecturersFilter(Filter):
         if not self.ordering_values:
             return query
         elif len(self.ordering_values) > 1:
-            raise ValueError('order_by (хотя бы пока что) поддерживает лишь один параметр для сортировки!')
+            raise ValueError(
+                "order_by (хотя бы пока что) поддерживает лишь один параметр для сортировки!"
+            )
 
         for field_name in self.ordering_values:
             direction = True
             if field_name.startswith("-"):
                 direction = False
             field_name = field_name.replace("-", "").replace("+", "")
-            if field_name.startswith('mark_'):
-                query = query.order_by(*self.Constants.model.order_by_mark(field_name, direction))
+            if field_name.startswith("mark_"):
+                query = query.order_by(
+                    *self.Constants.model.order_by_mark(field_name, direction)
+                )
             else:
-                query = query.order_by(*self.Constants.model.order_by_name(field_name, direction))
+                query = query.order_by(
+                    *self.Constants.model.order_by_name(field_name, direction)
+                )
             return query
 
     class Constants(Filter.Constants):

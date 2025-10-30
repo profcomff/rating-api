@@ -9,30 +9,29 @@ from _pytest.monkeypatch import MonkeyPatch
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from testcontainers.postgres import PostgresContainer
-
 from rating_api.models.db import *
 from rating_api.routes import app
 from rating_api.settings import Settings, get_settings
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from testcontainers.postgres import PostgresContainer
 
 
 class PostgresConfig:
     """Дата-класс со значениями для контейнера с тестовой БД и alembic-миграции."""
 
-    container_name: str = 'rating_test'
-    username: str = 'postgres'
-    host: str = 'localhost'
-    image: str = 'postgres:15'
+    container_name: str = "rating_test"
+    username: str = "postgres"
+    host: str = "localhost"
+    image: str = "postgres:15"
     external_port: int = 5433
-    ham: str = 'trust'
-    alembic_ini: str = Path(__file__).resolve().parent.parent / 'alembic.ini'
+    ham: str = "trust"
+    alembic_ini: str = Path(__file__).resolve().parent.parent / "alembic.ini"
 
     @classmethod
     def get_url(cls):
         """Возвращает URI для подключения к БД."""
-        return f'postgresql://{cls.username}@{cls.host}:{cls.external_port}/postgres'
+        return f"postgresql://{cls.username}@{cls.host}:{cls.external_port}/postgres"
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +42,7 @@ def session_mp():
     mp.undo()
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def get_settings_mock(session_mp):
     """Переопределение get_settings в rating_api/settings.py и перезагрузка base.app."""
 
@@ -54,11 +53,11 @@ def get_settings_mock(session_mp):
         return settings
 
     get_settings.cache_clear()
-    dsn_mock = session_mp.setattr('rating_api.settings.get_settings', get_test_settings)
-    reloaded_module = sys.modules['rating_api.routes.base']
+    dsn_mock = session_mp.setattr("rating_api.settings.get_settings", get_test_settings)
+    reloaded_module = sys.modules["rating_api.routes.base"]
     importlib.reload(reloaded_module)
-    importlib.reload(sys.modules['rating_api.routes.exc_handlers'])
-    globals()['app'] = reloaded_module.app
+    importlib.reload(sys.modules["rating_api.routes.exc_handlers"])
+    globals()["app"] = reloaded_module.app
     return dsn_mock
 
 
@@ -67,7 +66,9 @@ def db_container(get_settings_mock):
     """Фикстура настройки БД для тестов в Docker-контейнере."""
     container = (
         PostgresContainer(
-            image=PostgresConfig.image, username=PostgresConfig.username, dbname=PostgresConfig.container_name
+            image=PostgresConfig.image,
+            username=PostgresConfig.username,
+            dbname=PostgresConfig.container_name,
         )
         .with_bind_ports(5432, PostgresConfig.external_port)
         .with_env("POSTGRES_HOST_AUTH_METHOD", PostgresConfig.ham)
@@ -93,7 +94,7 @@ def dbsession(db_container):
 
 @pytest.fixture
 def client(mocker):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
+    user_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__")
     user_mock.return_value = {
         "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
         "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
@@ -108,7 +109,12 @@ def client(mocker):
 
 @pytest.fixture
 def lecturer(dbsession):
-    _lecturer = Lecturer(first_name="test_fname", last_name="test_lname", middle_name="test_mname", timetable_id=9900)
+    _lecturer = Lecturer(
+        first_name="test_fname",
+        last_name="test_lname",
+        middle_name="test_mname",
+        timetable_id=9900,
+    )
     dbsession.add(_lecturer)
     dbsession.commit()
     yield _lecturer
@@ -178,7 +184,7 @@ def nonanonymous_comment(dbsession, lecturer):
     dbsession.commit()
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def lecturers(dbsession):
     """
     Creates 4 lecturers(one with flag is_deleted=True)
@@ -190,11 +196,23 @@ def lecturers(dbsession):
     ]
 
     lecturers = [
-        Lecturer(id=lecturer_id, first_name=fname, last_name=lname, middle_name=mname, timetable_id=timetable_id)
+        Lecturer(
+            id=lecturer_id,
+            first_name=fname,
+            last_name=lname,
+            middle_name=mname,
+            timetable_id=timetable_id,
+        )
         for lecturer_id, fname, lname, mname, timetable_id in lecturers_data
     ]
     lecturers.append(
-        Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
+        Lecturer(
+            id=4,
+            first_name="test_fname3",
+            last_name="test_lname3",
+            middle_name="test_mname3",
+            timetable_id=9903,
+        )
     )
     lecturers[-1].is_deleted = True
     for lecturer in lecturers:
@@ -224,28 +242,36 @@ def lecturers_with_comments(dbsession, lecturers):
         One of them have a different subject.
     """
     comments_data = [
-        (lecturers[0].id, 9990, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[0].id, None, 'test_subject1', ReviewStatus.APPROVED, 2, 2, 2),
-        (lecturers[0].id, 9990, 'test_subject2', ReviewStatus.DISMISSED, -1, -1, -1),
-        (lecturers[0].id, 9990, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[0].id, 9991, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[0].id, 9992, 'test_subject12', ReviewStatus.APPROVED, 2, 2, 2),
-        (lecturers[1].id, 9990, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[1].id, None, 'test_subject1', ReviewStatus.APPROVED, -1, -1, -1),
-        (lecturers[1].id, 9990, 'test_subject2', ReviewStatus.DISMISSED, -2, -2, -2),
-        (lecturers[1].id, 9990, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[1].id, 9991, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[1].id, 9992, 'test_subject12', ReviewStatus.APPROVED, -1, -1, -1),
-        (lecturers[2].id, 9990, 'test_subject', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[2].id, None, 'test_subject1', ReviewStatus.APPROVED, 0, 0, 0),
-        (lecturers[2].id, 9990, 'test_subject2', ReviewStatus.DISMISSED, 2, 2, 2),
-        (lecturers[2].id, 9990, 'test_subject2', ReviewStatus.PENDING, -2, -2, -2),
-        (lecturers[2].id, 9991, 'test_subject11', ReviewStatus.APPROVED, 1, 1, 1),
-        (lecturers[2].id, 9992, 'test_subject13', ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[0].id, 9990, "test_subject", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, None, "test_subject1", ReviewStatus.APPROVED, 2, 2, 2),
+        (lecturers[0].id, 9990, "test_subject2", ReviewStatus.DISMISSED, -1, -1, -1),
+        (lecturers[0].id, 9990, "test_subject2", ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[0].id, 9991, "test_subject11", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[0].id, 9992, "test_subject12", ReviewStatus.APPROVED, 2, 2, 2),
+        (lecturers[1].id, 9990, "test_subject", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, None, "test_subject1", ReviewStatus.APPROVED, -1, -1, -1),
+        (lecturers[1].id, 9990, "test_subject2", ReviewStatus.DISMISSED, -2, -2, -2),
+        (lecturers[1].id, 9990, "test_subject2", ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[1].id, 9991, "test_subject11", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[1].id, 9992, "test_subject12", ReviewStatus.APPROVED, -1, -1, -1),
+        (lecturers[2].id, 9990, "test_subject", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, None, "test_subject1", ReviewStatus.APPROVED, 0, 0, 0),
+        (lecturers[2].id, 9990, "test_subject2", ReviewStatus.DISMISSED, 2, 2, 2),
+        (lecturers[2].id, 9990, "test_subject2", ReviewStatus.PENDING, -2, -2, -2),
+        (lecturers[2].id, 9991, "test_subject11", ReviewStatus.APPROVED, 1, 1, 1),
+        (lecturers[2].id, 9992, "test_subject13", ReviewStatus.APPROVED, 0, 0, 0),
     ]
 
     comments = []
-    for lecturer_id, user_id, subject, review_status, mark_kindness, mark_clarity, mark_freebie in comments_data:
+    for (
+        lecturer_id,
+        user_id,
+        subject,
+        review_status,
+        mark_kindness,
+        mark_clarity,
+        mark_freebie,
+    ) in comments_data:
         comment = Comment(
             subject=subject,
             text="test_comment",

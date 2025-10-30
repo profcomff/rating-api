@@ -35,8 +35,8 @@ class TooManyCommentRequests(RatingAPIError):
         self.frequency = frequency
         self.limit = limit
         super().__init__(
-            f'Too many comment requests. Allowed: {limit} comments per {frequency} months.',
-            f'Слишком много попыток оставить комментарий. Разрешено: {limit} комментариев за {frequency} месяцев.',
+            f"Too many comment requests. Allowed: {limit} comments per {frequency} months.",
+            f"Слишком много попыток оставить комментарий. Разрешено: {limit} комментариев за {frequency} месяцев.",
         )
 
 
@@ -55,13 +55,17 @@ class TooManyCommentsToLecturer(RatingAPIError):
 
 class ForbiddenAction(RatingAPIError):
     def __init__(self, type: Type):
-        super().__init__(f"Forbidden action with {type.__name__}", f"Запрещенное действие с объектом {type.__name__}")
+        super().__init__(
+            f"Forbidden action with {type.__name__}",
+            f"Запрещенное действие с объектом {type.__name__}",
+        )
 
 
 class WrongMark(RatingAPIError):
     def __init__(self):
         super().__init__(
-            f"Ratings can only take values: -2, -1, 0, 1, 2", f"Оценки могут принимать только значения: -2, -1, 0, 1, 2"
+            f"Ratings can only take values: -2, -1, 0, 1, 2",
+            f"Оценки могут принимать только значения: -2, -1, 0, 1, 2",
         )
 
 

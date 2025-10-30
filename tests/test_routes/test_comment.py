@@ -3,20 +3,18 @@ import logging
 import uuid
 
 import pytest
-from starlette import status
-
 from rating_api.models import Comment, LecturerUserComment, ReviewStatus
 from rating_api.settings import get_settings
-
+from starlette import status
 
 logger = logging.getLogger(__name__)
-url: str = '/comment'
+url: str = "/comment"
 
 settings = get_settings()
 
 
 @pytest.mark.parametrize(
-    'body,lecturer_n,response_status',
+    "body,lecturer_n,response_status",
     [
         (
             {
@@ -115,7 +113,7 @@ settings = get_settings()
                 "mark_kindness": 1,
                 "mark_freebie": -2,
                 "mark_clarity": 0,
-                "is_anonymous": 'asd',
+                "is_anonymous": "asd",
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -152,7 +150,7 @@ settings = get_settings()
         (  # long comment
             {
                 "subject": "test_subject",
-                "text": 'a' * 3001,
+                "text": "a" * 3001,
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
@@ -164,7 +162,7 @@ settings = get_settings()
         (  # long comment but not that long
             {
                 "subject": "test_subject",
-                "text": 'a' * 3000,
+                "text": "a" * 3000,
                 "mark_kindness": 1,
                 "mark_freebie": 0,
                 "mark_clarity": 0,
@@ -175,18 +173,28 @@ settings = get_settings()
         ),
     ],
 )
-def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
+def test_create_comment(
+    client, dbsession, lecturers, body, lecturer_n, response_status
+):
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
     assert post_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
-        comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
+        comment = (
+            Comment.query(session=dbsession)
+            .filter(Comment.uuid == post_response.json()["uuid"])
+            .one_or_none()
+        )
         assert comment is not None
 
         if "create_ts" in body:
-            assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
+            assert comment.create_ts == datetime.datetime.fromisoformat(
+                body["create_ts"]
+            ).replace(tzinfo=None)
         if "update_ts" in body:
-            assert comment.update_ts == datetime.datetime.fromisoformat(body["update_ts"]).replace(tzinfo=None)
+            assert comment.update_ts == datetime.datetime.fromisoformat(
+                body["update_ts"]
+            ).replace(tzinfo=None)
 
         user_comment = (
             LecturerUserComment.query(session=dbsession)
@@ -197,21 +205,28 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
 
 
 def test_get_comment(client, comment):
-    response_comment = client.get(f'{url}/{comment.uuid}')
+    response_comment = client.get(f"{url}/{comment.uuid}")
     print("1")
     assert response_comment.status_code == status.HTTP_200_OK
     random_uuid = uuid.uuid4()
-    response = client.get(f'{url}/{random_uuid}')
+    response = client.get(f"{url}/{random_uuid}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.mark.parametrize(
-    'lecturer_n,response_status',
-    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK), (3, status.HTTP_404_NOT_FOUND)],
+    "lecturer_n,response_status",
+    [
+        (0, status.HTTP_200_OK),
+        (1, status.HTTP_200_OK),
+        (2, status.HTTP_200_OK),
+        (3, status.HTTP_404_NOT_FOUND),
+    ],
 )
-def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, response_status):
+def test_comments_by_lecturer_id(
+    client, lecturers_with_comments, lecturer_n, response_status
+):
     lecturers, comments = lecturers_with_comments
-    response = client.get(f'{url}', params={"lecturer_id": lecturers[lecturer_n].id})
+    response = client.get(f"{url}", params={"lecturer_id": lecturers[lecturer_n].id})
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
         json_response = response.json()
@@ -227,11 +242,12 @@ def test_comments_by_lecturer_id(client, lecturers_with_comments, lecturer_n, re
 
 
 @pytest.mark.parametrize(
-    'user_id,response_status', [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)]
+    "user_id,response_status",
+    [(0, status.HTTP_200_OK), (1, status.HTTP_200_OK), (2, status.HTTP_200_OK)],
 )
 def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_status):
     _, comments = lecturers_with_comments
-    response = client.get(f'{url}', params={"user_id": 9990 + user_id})
+    response = client.get(f"{url}", params={"user_id": 9990 + user_id})
     assert response.status_code == response_status
     if response.status_code == status.HTTP_200_OK:
         json_response = response.json()
@@ -247,7 +263,7 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
 
 
 @pytest.mark.parametrize(
-    'review_status, response_status, is_reviewed',
+    "review_status, response_status, is_reviewed",
     [
         ("approved", status.HTTP_200_OK, True),
         ("approved", status.HTTP_200_OK, False),
@@ -257,7 +273,15 @@ def test_comments_by_user_id(client, lecturers_with_comments, user_id, response_
         ("wrong_status", status.HTTP_422_UNPROCESSABLE_ENTITY, False),
     ],
 )
-def test_review_comment(client, dbsession, unreviewed_comment, comment, review_status, response_status, is_reviewed):
+def test_review_comment(
+    client,
+    dbsession,
+    unreviewed_comment,
+    comment,
+    review_status,
+    response_status,
+    is_reviewed,
+):
     commment_to_review = comment if is_reviewed else unreviewed_comment
     query = {"review_status": review_status}
     response = client.patch(f"{url}/{commment_to_review.uuid}/review", params=query)
@@ -268,7 +292,7 @@ def test_review_comment(client, dbsession, unreviewed_comment, comment, review_s
 
 
 @pytest.mark.parametrize(
-    'body, response_status',
+    "body, response_status",
     [
         (
             {
@@ -362,20 +386,20 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
 
 def test_post_like(client, dbsession, comment):
     # Like
-    response = client.put(f'{url}/{comment.uuid}/like')
+    response = client.put(f"{url}/{comment.uuid}/like")
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 1
 
     # Dislike
-    response = client.put(f'{url}/{comment.uuid}/dislike')
+    response = client.put(f"{url}/{comment.uuid}/dislike")
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 0
     assert comment.dislike_count == 1
 
     # click dislike one more time
-    response = client.put(f'{url}/{comment.uuid}/dislike')
+    response = client.put(f"{url}/{comment.uuid}/dislike")
     assert response.status_code == status.HTTP_200_OK
     dbsession.refresh(comment)
     assert comment.like_count == 0
