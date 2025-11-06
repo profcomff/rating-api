@@ -2,31 +2,40 @@ import logging
 
 import pytest
 from fastapi_sqlalchemy import db
+from rating_api.models import Comment, Lecturer, ReviewStatus
+from rating_api.settings import get_settings
 from sqlalchemy import and_, func, select
 from starlette import status
 
-from rating_api.models import Comment, Lecturer, ReviewStatus
-from rating_api.settings import get_settings
-
-
 logger = logging.getLogger(__name__)
-url: str = '/lecturer'
+url: str = "/lecturer"
 
 settings = get_settings()
 
 
-@pytest.mark.parametrize('response_status', [status.HTTP_200_OK, status.HTTP_409_CONFLICT])
+@pytest.mark.parametrize(
+    "response_status", [status.HTTP_200_OK, status.HTTP_409_CONFLICT]
+)
 def test_create_lecturer(client, dbsession, response_status):
-    body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
+    body = {
+        "first_name": "Иван",
+        "last_name": "Иванов",
+        "middle_name": "Иванович",
+        "timetable_id": 0,
+    }
     post_response = client.post(url, json=body)
     assert post_response.status_code == response_status
     # cleanup on a last run
     if response_status == status.HTTP_409_CONFLICT:
-        lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        lecturer = (
+            dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        )
         assert lecturer is not None
         dbsession.delete(lecturer)
         dbsession.commit()
-        lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        lecturer = (
+            dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
+        )
         assert lecturer is None
 
 
@@ -61,13 +70,15 @@ def test_get_lecturer_by_timetable_id(client, dbsession, lecturers, lecturer_n, 
 )
 def test_get_lecturer(client, dbsession, lecturers, lecturer_n, response_status):
     lecturer = (
-        dbsession.query(Lecturer).filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id).one_or_none()
+        dbsession.query(Lecturer)
+        .filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id)
+        .one_or_none()
     )
     # check non-existing id request
     lecturer_id = -1
     if lecturer:
         lecturer_id = lecturer.id
-    get_response = client.get(f'{url}/{lecturer_id}')
+    get_response = client.get(f"{url}/{lecturer_id}")
     assert get_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = get_response.json()
@@ -80,7 +91,7 @@ def test_get_lecturer(client, dbsession, lecturers, lecturer_n, response_status)
 
 
 @pytest.mark.parametrize(
-    'lecturer_n,mark_kindness_weighted,mark_freebie_weighted,mark_clarity_weighted,mark_weighted',
+    "lecturer_n,mark_kindness_weighted,mark_freebie_weighted,mark_clarity_weighted,mark_weighted",
     [(0, 1.5, 1.5, 1.5, 1.5), (1, 0, 0, 0, 0), (2, 0.5, 0.5, 0.5, 0.5)],
 )
 def test_get_lecturer_with_comments(
@@ -93,8 +104,8 @@ def test_get_lecturer_with_comments(
     mark_weighted,
 ):
     lecturers, comments = lecturers_with_comments
-    query = {"info": ['comments']}
-    response = client.get(f'{url}/{lecturers[lecturer_n].id}', params=query)
+    query = {"info": ["comments"]}
+    response = client.get(f"{url}/{lecturers[lecturer_n].id}", params=query)
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
     assert comments[lecturer_n * 6 + 0].subject in json_response["subjects"]
@@ -104,16 +115,16 @@ def test_get_lecturer_with_comments(
 
 
 @pytest.mark.parametrize(
-    'query,total,response_status',
+    "query,total,response_status",
     [
-        ({'name': 'test_lname1'}, 1, status.HTTP_200_OK),
-        ({'name': 'TeSt_LnAmE1'}, 1, status.HTTP_200_OK),
-        ({'name': 'test'}, 2, status.HTTP_200_OK),
-        ({'name': 'testlname123'}, 0, status.HTTP_404_NOT_FOUND),
+        ({"name": "test_lname1"}, 1, status.HTTP_200_OK),
+        ({"name": "TeSt_LnAmE1"}, 1, status.HTTP_200_OK),
+        ({"name": "test"}, 2, status.HTTP_200_OK),
+        ({"name": "testlname123"}, 0, status.HTTP_404_NOT_FOUND),
     ],
 )
 def test_get_lecturers_by_name(client, lecturers, query, total, response_status):
-    get_response = client.get(f'{url}', params=query)
+    get_response = client.get(f"{url}", params=query)
     assert get_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = get_response.json()
@@ -121,18 +132,18 @@ def test_get_lecturers_by_name(client, lecturers, query, total, response_status)
         assert json_response["lecturers"][0]["first_name"] == lecturers[0].first_name
 
 
-@pytest.mark.usefixtures('lecturers_with_comments')
+@pytest.mark.usefixtures("lecturers_with_comments")
 @pytest.mark.parametrize(
-    'query, response_status',
+    "query, response_status",
     [
-        ({'subject': 'test_subject'}, status.HTTP_200_OK),
-        ({'subject': 'test_subject13'}, status.HTTP_200_OK),
-        ({'subject': 'test_subject666'}, status.HTTP_404_NOT_FOUND),
+        ({"subject": "test_subject"}, status.HTTP_200_OK),
+        ({"subject": "test_subject13"}, status.HTTP_200_OK),
+        ({"subject": "test_subject666"}, status.HTTP_404_NOT_FOUND),
     ],
     ids=[
-        'get_all',
-        'get_some',
-        'wrong_subject',
+        "get_all",
+        "get_some",
+        "wrong_subject",
     ],
 )
 def test_get_lecturers_by_subject(client, dbsession, query, response_status):
@@ -140,61 +151,75 @@ def test_get_lecturers_by_subject(client, dbsession, query, response_status):
     Проверка, что при передаче subject возвращаются только лекторы,
     в одобренных комментариях к которым есть поле subject, совпадающее с переданным.
     """
-    resp = client.get(f'{url}', params=query)
+    resp = client.get(f"{url}", params=query)
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
         db_lecturers = {
             comment.lecturer_id
             for comment in Comment.query(session=dbsession).filter(
-                and_(Comment.review_status == ReviewStatus.APPROVED, Comment.subject == query['subject'])
+                and_(
+                    Comment.review_status == ReviewStatus.APPROVED,
+                    Comment.subject == query["subject"],
+                )
             )
         }
-        resp_lecturers = {lecturer['id'] for lecturer in resp.json()['lecturers']}
+        resp_lecturers = {lecturer["id"] for lecturer in resp.json()["lecturers"]}
         assert resp_lecturers == db_lecturers
 
 
-@pytest.mark.usefixtures('lecturers_with_comments')
+@pytest.mark.usefixtures("lecturers_with_comments")
 @pytest.mark.parametrize(
-    'query, response_status',
+    "query, response_status",
     [
-        ({'mark': -2}, status.HTTP_200_OK),
-        ({'mark': 0}, status.HTTP_200_OK),
-        ({'mark': 2}, status.HTTP_404_NOT_FOUND),
-        ({'mark': -3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({'mark': 3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"mark": -2}, status.HTTP_200_OK),
+        ({"mark": 0}, status.HTTP_200_OK),
+        ({"mark": 2}, status.HTTP_404_NOT_FOUND),
+        ({"mark": -3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"mark": 3}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
-    ids=['get_all', 'get_some', 'get_nothing', 'under_min', 'above_max'],
+    ids=["get_all", "get_some", "get_nothing", "under_min", "above_max"],
 )
 def test_get_lecturers_by_mark(client, dbsession, query, response_status):
     """
     Проверка, что при передаче mark возвращаются только лекторы
     со средним mark_general (по комментариям) не меньше, чем переданный mark.
     """
-    resp = client.get(f'{url}', params=query)
+    resp = client.get(f"{url}", params=query)
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
         res = dbsession.execute(
             (
-                select(Lecturer.id.label('lecturer'), func.avg(Comment.mark_general).label('avg'))
-                .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
+                select(
+                    Lecturer.id.label("lecturer"),
+                    func.avg(Comment.mark_general).label("avg"),
+                )
+                .join(
+                    Comment,
+                    and_(
+                        Comment.review_status == ReviewStatus.APPROVED,
+                        Lecturer.id == Comment.lecturer_id,
+                    ),
+                )
                 .group_by(Lecturer.id)
-                .having(func.avg(Comment.mark_general) > query['mark'])
+                .having(func.avg(Comment.mark_general) > query["mark"])
             )
         ).all()
-        resp_lecturers = {lecturer['id'] for lecturer in resp.json()['lecturers']}
+        resp_lecturers = {lecturer["id"] for lecturer in resp.json()["lecturers"]}
         db_lecturers = {req[0] for req in res}
-        assert resp_lecturers == db_lecturers, 'Убедитесь, что все подходящие лекторы отправляются пользователю!'
+        assert (
+            resp_lecturers == db_lecturers
+        ), "Убедитесь, что все подходящие лекторы отправляются пользователю!"
 
 
-@pytest.mark.usefixtures('lecturers_with_comments')
+@pytest.mark.usefixtures("lecturers_with_comments")
 @pytest.mark.parametrize(
-    'query, response_status',
+    "query, response_status",
     [
-        ({'info': ['comments']}, status.HTTP_200_OK),
-        ({'info': ['comments']}, status.HTTP_200_OK),
-        ({'info': []}, status.HTTP_200_OK),
-        ({'info': {}}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({'info': ['pupupu']}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"info": ["comments"]}, status.HTTP_200_OK),
+        ({"info": ["comments"]}, status.HTTP_200_OK),
+        ({"info": []}, status.HTTP_200_OK),
+        ({"info": {}}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"info": ["pupupu"]}, status.HTTP_422_UNPROCESSABLE_ENTITY),
     ],
     ids=["comments", "comments", "no_info", "invalid_iterator", "invalid_param"],
 )
@@ -203,95 +228,114 @@ def test_get_lecturers_by_info(client, dbsession, query, response_status):
     Проверка, что при передаче info разного состава возвращаются лекторы
     с полями комментариев и/или оценок на основе них для каждого лектора.
     """
-    resp = client.get(f'{url}', params=query)
+    resp = client.get(f"{url}", params=query)
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
-        if 'comments' in query['info']:
+        if "comments" in query["info"]:
             db_res = dbsession.execute(
                 (
-                    select(Lecturer.id.label('lecturer'), func.count(Comment.uuid))
+                    select(Lecturer.id.label("lecturer"), func.count(Comment.uuid))
                     .join(
                         Comment,
-                        and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id),
+                        and_(
+                            Comment.review_status == ReviewStatus.APPROVED,
+                            Lecturer.id == Comment.lecturer_id,
+                        ),
                     )
                     .group_by(Lecturer.id)
                 )
             ).all()
             db_lecturers = {*db_res}
-            assert len(resp.json()['lecturers']) == len(db_lecturers)
-            for lecturer in resp.json()['lecturers']:
-                assert (lecturer['id'], len(lecturer['comments'])) in db_lecturers
+            assert len(resp.json()["lecturers"]) == len(db_lecturers)
+            for lecturer in resp.json()["lecturers"]:
+                assert (lecturer["id"], len(lecturer["comments"])) in db_lecturers
 
 
-@pytest.mark.usefixtures('lecturers_with_comments')
+@pytest.mark.usefixtures("lecturers_with_comments")
 @pytest.mark.parametrize(
-    'query, response_status',
+    "query, response_status",
     [
-        ({'order_by': 'mark_kindness'}, status.HTTP_200_OK),
+        ({"order_by": "mark_kindness"}, status.HTTP_200_OK),
         ({}, status.HTTP_200_OK),
-        ({'order_by': '+mark_freebie'}, status.HTTP_200_OK),
-        ({'order_by': '-mark_clarity'}, status.HTTP_200_OK),
-        ({'order_by': 'pupupu'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
-        ({'order_by': 'mark_kindness,mark_freebie'}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        ({"order_by": "+mark_freebie"}, status.HTTP_200_OK),
+        ({"order_by": "-mark_clarity"}, status.HTTP_200_OK),
+        ({"order_by": "pupupu"}, status.HTTP_422_UNPROCESSABLE_ENTITY),
+        (
+            {"order_by": "mark_kindness,mark_freebie"},
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
     ],
-    ids=["valid", "valid_default", "valid_plus", "valid_minus", "invalid_param", "invalid_many_params"],
+    ids=[
+        "valid",
+        "valid_default",
+        "valid_plus",
+        "valid_minus",
+        "invalid_param",
+        "invalid_many_params",
+    ],
 )
 def test_get_lecturers_order_by(client, dbsession, query, response_status):
     """
     Проверка, что при передаче (или нет) параметра order_by возвращаемый
     список лекторов верно сортируется.
     """
-    resp = client.get(f'{url}', params=query)
+    resp = client.get(f"{url}", params=query)
     assert resp.status_code == response_status
     if response_status == status.HTTP_200_OK:
-        if 'order_by' not in query:
-            field_name = 'mark_weighted'
+        if "order_by" not in query:
+            field_name = "mark_weighted"
             asc_order = True
-        elif query['order_by'].startswith('+'):
-            field_name = query['order_by'][1:]
+        elif query["order_by"].startswith("+"):
+            field_name = query["order_by"][1:]
             asc_order = True
-        elif query['order_by'].startswith('-'):
-            field_name = query['order_by'][1:]
+        elif query["order_by"].startswith("-"):
+            field_name = query["order_by"][1:]
             asc_order = False
         else:
-            field_name = query['order_by']
+            field_name = query["order_by"]
             asc_order = True
         with db():
             db_res = (
                 Lecturer.query(session=dbsession)
-                .join(Comment, and_(Comment.review_status == ReviewStatus.APPROVED, Lecturer.id == Comment.lecturer_id))
+                .join(
+                    Comment,
+                    and_(
+                        Comment.review_status == ReviewStatus.APPROVED,
+                        Lecturer.id == Comment.lecturer_id,
+                    ),
+                )
                 .group_by(Lecturer.id)
                 .order_by(*Lecturer.order_by_mark(field_name, asc_order))
                 .all()
             )
         db_lecturers = [lecturer.id for lecturer in db_res]
-        resp_lecturers = [lecturer['id'] for lecturer in resp.json()['lecturers']]
+        resp_lecturers = [lecturer["id"] for lecturer in resp.json()["lecturers"]]
         assert resp_lecturers == db_lecturers
 
 
 @pytest.mark.parametrize(
-    'body,response_status',
+    "body,response_status",
     [
         (
             {
-                "first_name": 'Test',
-                "last_name": 'Testov',
-                "middle_name": 'Testovich',
+                "first_name": "Test",
+                "last_name": "Testov",
+                "middle_name": "Testovich",
             },
             status.HTTP_200_OK,
         ),
         (
             {
-                "first_name": 'Testa',
-                "last_name": 'Testova',
-                "middle_name": 'Testovna',
+                "first_name": "Testa",
+                "last_name": "Testova",
+                "middle_name": "Testovna",
             },
             status.HTTP_200_OK,
         ),
         (
             {
-                "first_name": 'Test',
-                "last_name": 'Testov',
+                "first_name": "Test",
+                "last_name": "Testov",
                 "middle_name": 1,
             },
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -299,12 +343,12 @@ def test_get_lecturers_order_by(client, dbsession, query, response_status):
     ],
 )
 def test_update_lecturer(client, lecturer, body, response_status):
-    response = client.get(f'{url}/{lecturer.id}')
+    response = client.get(f"{url}/{lecturer.id}")
     assert response.status_code == status.HTTP_200_OK
     json_response = response.json()
-    assert json_response['first_name'] == lecturer.first_name
-    assert json_response['last_name'] == lecturer.last_name
-    assert json_response['middle_name'] == lecturer.middle_name
+    assert json_response["first_name"] == lecturer.first_name
+    assert json_response["last_name"] == lecturer.last_name
+    assert json_response["middle_name"] == lecturer.middle_name
     response = client.patch(f"{url}/{lecturer.id}", json=body)
     assert response.status_code == response_status
     if response_status == status.HTTP_200_OK:
@@ -330,13 +374,13 @@ def test_delete_lecturer(client, dbsession, lecturers_with_comments):
     assert comments[2].is_deleted
     assert lecturers[0].is_deleted
     # trying to get deleted
-    response = client.get(f'{url}/{lecturers[0].id}')
+    response = client.get(f"{url}/{lecturers[0].id}")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.usefixtures('lecturers')
+@pytest.mark.usefixtures("lecturers")
 @pytest.mark.parametrize(
-    'body, response_status',
+    "body, response_status",
     [
         (
             {
@@ -372,7 +416,7 @@ def test_delete_lecturer(client, dbsession, lecturers_with_comments):
     ],
 )
 def test_lecturer_rating_update(client, dbsession, body, response_status):
-    response = client.patch('/lecturer/import_rating', json=[body])
+    response = client.patch("/lecturer/import_rating", json=[body])
 
     if response_status == status.HTTP_200_OK:
 
