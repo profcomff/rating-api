@@ -40,7 +40,7 @@ def test_create_lecturer(client, dbsession, response_status):
 
 
 @pytest.mark.parametrize(
-    "lecturer_n, response_status",
+    'lecturer_n, response_status',
     [
         (0, status.HTTP_200_OK),
         (1, status.HTTP_200_OK),
@@ -48,23 +48,19 @@ def test_create_lecturer(client, dbsession, response_status):
         (3, status.HTTP_404_NOT_FOUND),
     ],
 )
-def test_get_lecturer_by_timetable_id(
-    client, dbsession, lecturers, lecturer_n, response_status
-):
+def test_get_lecturer_by_timetable_id(client, dbsession, lecturers, lecturer_n, response_status):
     lecturer = (
-        dbsession.query(Lecturer)
-        .filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id)
-        .one_or_none()
+        dbsession.query(Lecturer).filter(Lecturer.timetable_id == lecturers[lecturer_n].timetable_id).one_or_none()
     )
     timetable_id = -1
     if lecturer:
         timetable_id = lecturer.timetable_id
-    get_response = client.get(f"{url}/timetable-id/{timetable_id}")
+    get_response = client.get(f'{url}/timetable-id/{timetable_id}')
     assert get_response.status_code == response_status
 
 
 @pytest.mark.parametrize(
-    "lecturer_n,response_status",
+    'lecturer_n,response_status',
     [
         (0, status.HTTP_200_OK),
         (1, status.HTTP_200_OK),
