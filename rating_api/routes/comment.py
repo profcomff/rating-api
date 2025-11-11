@@ -246,6 +246,19 @@ async def get_comments(
     result.total = len(result.comments)
     result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
 
+    # Получаем ФИО пользователя
+    comments_with_usernames = []
+    for comment in result.comments:
+        if user and comment.user_id == user.get("id"):
+            userdata_info = user.get("userdata", [])
+            full_name_info = list(filter(lambda x: x.get('param') == "Полное имя", userdata_info))
+            comment.user_full_name = full_name_info[0].get("value") if full_name_info else None
+        else:
+            comment.user_full_name = None
+        comments_with_usernames.append(comment)
+
+    result.comments = comments_with_usernames
+
     return result
 
 

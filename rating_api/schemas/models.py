@@ -25,6 +25,7 @@ class CommentGet(Base):
     lecturer_id: int
     like_count: int
     dislike_count: int
+    user_full_name: str | None = None
 
 
 class CommentGetWithStatus(CommentGet):
