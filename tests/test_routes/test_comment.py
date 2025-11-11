@@ -455,6 +455,33 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
             assert getattr(nonanonymous_comment, k, None) == v  # Есть ли изменения в БД
 
 
+@pytest.mark.parametrize("is_own_comment", [True, False])
+def test_user_full_name_field(client, dbsession, lecturers, user, is_own_comment):
+    """Проверяет, что user_full_name заполняется только для комментариев текущего пользователя"""
+    lecturer = lecturers[0]
+    comment_data = {
+        "user_id": user.get("id") if is_own_comment else 9999,
+        "lecturer_id": lecturer.id,
+        "subject": "Test subject",
+        "text": "Test text",
+        "mark_kindness": 1,
+        "mark_freebie": 0,
+        "mark_clarity": 0,
+        "review_status": ReviewStatus.APPROVED,
+    }
+    comment = Comment(**comment_data)
+    dbsession.add(comment)
+    dbsession.commit()
+
+    response = client.get(f_url(comment.uuid))
+
+    assert response.status_code == status.HTTP_200_OK
+    if is_own_comment:
+        assert response.json()["user_full_name"] is not None
+    else:
+        assert response.json()["user_full_name"] is None
+
+
 # TODO: переписать под новую логику
 # def test_delete_comment(client, dbsession, comment):
 #     response = client.delete(f'{url}/{comment.uuid}')
