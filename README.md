@@ -25,4 +25,4 @@
     ```
 
 ## ENV-file description
--  – Данные для подключения к БД`DB_DSN=postgresql://postgres@localhost:5432/postgres`
+- `DB_DSN=postgresql://postgres@localhost:5432/postgres` – Данные для подключения к БД
