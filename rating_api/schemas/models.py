@@ -27,6 +27,11 @@ class CommentGet(Base):
     dislike_count: int
 
 
+class CommentGetWithLike(CommentGet):
+    is_liked: bool
+    is_disliked: bool
+
+
 class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
 
