@@ -228,15 +228,15 @@ def test_get_comment_with_reaction(client, dbsession, comment, reaction_data, ex
 
     response_comment = client.get(f'{url}/{comment.uuid}')
 
-    if response_comment.status_code == status.HTTP_404_NOT_FOUND:
-        return
-
-    data = response_comment.json()
-    if expected_reaction:
-        assert data[expected_reaction]
+    if response_comment:
+        data = response_comment.json()
+        if expected_reaction:
+            assert data[expected_reaction]
+        else:
+            assert data["is_liked"] == False
+            assert data["is_disliked"] == False
     else:
-        assert data["is_liked"] == False
-        assert data["is_disliked"] == False
+        assert response_comment.status_code == status.HTTP_404_NOT_FOUND
 
 
 
