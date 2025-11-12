@@ -24,11 +24,11 @@ from rating_api.schemas.models import (
     CommentGetAllWithAllInfo,
     CommentGetAllWithStatus,
     CommentGetWithAllInfo,
+    CommentGetWithLike,
     CommentGetWithStatus,
     CommentImportAll,
     CommentPost,
     CommentUpdate,
-    CommentGetWithLike,
 )
 from rating_api.settings import Settings, get_settings
 
@@ -157,7 +157,7 @@ async def import_comments(
 
 
 @comment.get("/{uuid}", response_model=CommentGetWithLike)
-async def get_comment(uuid: UUID, user = Depends(UnionAuth())) -> CommentGetWithLike:
+async def get_comment(uuid: UUID, user=Depends(UnionAuth())) -> CommentGetWithLike:
     """
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
@@ -165,7 +165,11 @@ async def get_comment(uuid: UUID, user = Depends(UnionAuth())) -> CommentGetWith
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
     base_data = CommentGet.model_validate(comment)
-    return CommentGetWithLike(**base_data.model_dump(), is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE), is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE))
+    return CommentGetWithLike(
+        **base_data.model_dump(),
+        is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE),
+        is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE),
+    )
 
 
 @comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
