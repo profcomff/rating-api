@@ -7,7 +7,7 @@ from fastapi_filter.contrib.sqlalchemy import Filter
 from pydantic import ValidationInfo, field_validator
 
 from rating_api.exceptions import WrongMark
-from rating_api.models import Lecturer, ReviewStatus, Reaction
+from rating_api.models import Lecturer, ReviewStatus
 from rating_api.schemas.base import Base
 
 
@@ -27,9 +27,11 @@ class CommentGet(Base):
     dislike_count: int
     user_fullname: str | None = None
 
+
 class CommentGetWithLike(CommentGet):
     is_liked: bool
     is_disliked: bool
+
 
 class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
