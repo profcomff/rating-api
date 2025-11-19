@@ -102,18 +102,18 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
 
-    user_fullname = None
+    fullname = None
     if not comment_info.is_anonymous:
         userdata_info = user.get("userdata", [])
         fullname_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
-        user_fullname = fullname_info[0]["value"] if len(fullname_info) != 0 else None
+        fullname = fullname_info[0]["value"] if len(fullname_info) != 0 else None
 
     new_comment = Comment.create(
         session=db.session,
         **comment_info.model_dump(exclude={"is_anonymous"}),
         lecturer_id=lecturer_id,
         user_id=user_id,
-        user_fullname=user_fullname,
+        user_fullname=fullname,
         review_status=ReviewStatus.PENDING,
     )
 
