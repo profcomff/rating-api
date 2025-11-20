@@ -28,6 +28,11 @@ class CommentGet(Base):
     user_fullname: str | None = None
 
 
+class CommentGetWithLike(CommentGet):
+    is_liked: bool
+    is_disliked: bool
+
+
 class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
 

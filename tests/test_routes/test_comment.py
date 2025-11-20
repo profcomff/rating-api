@@ -1,6 +1,5 @@
 import datetime
 import logging
-import uuid
 
 import pytest
 from starlette import status
@@ -196,13 +195,42 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
         assert user_comment is not None
 
 
-def test_get_comment(client, comment):
+@pytest.mark.parametrize(
+    "reaction_data, expected_reaction, comment_user_id",
+    [
+        (None, None, 0),
+        ((0, Reaction.LIKE), "is_liked", 0),  # my like on my comment
+        ((0, Reaction.DISLIKE), "is_disliked", 0),
+        ((999, Reaction.LIKE), None, 0),  # someone else's like on my comment
+        ((999, Reaction.DISLIKE), None, 0),
+        ((0, Reaction.LIKE), "is_liked", 999),  # my like on someone else's comment
+        ((0, Reaction.DISLIKE), "is_disliked", 999),
+        ((333, Reaction.LIKE), None, 999),  # someone else's like on another person's comment
+        ((333, Reaction.DISLIKE), None, 999),
+        (None, None, None),  # anonymous
+    ],
+)
+def test_get_comment_with_reaction(client, dbsession, comment, reaction_data, expected_reaction, comment_user_id):
+    comment.user_id = comment_user_id
+
+    if reaction_data:
+        user_id, reaction_type = reaction_data
+        reaction = CommentReaction(user_id=user_id, comment_uuid=comment.uuid, reaction=reaction_type)
+        dbsession.add(reaction)
+
+    dbsession.commit()
+
     response_comment = client.get(f'{url}/{comment.uuid}')
-    print("1")
-    assert response_comment.status_code == status.HTTP_200_OK
-    random_uuid = uuid.uuid4()
-    response = client.get(f'{url}/{random_uuid}')
-    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    if response_comment:
+        data = response_comment.json()
+        if expected_reaction:
+            assert data[expected_reaction]
+        else:
+            assert data["is_liked"] == False
+            assert data["is_disliked"] == False
+    else:
+        assert response_comment.status_code == status.HTTP_404_NOT_FOUND
 
 
 @pytest.fixture
