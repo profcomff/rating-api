@@ -22,8 +22,10 @@ from rating_api.schemas.models import (
     CommentGet,
     CommentGetAll,
     CommentGetAllWithAllInfo,
+    CommentGetAllWithLike,
     CommentGetAllWithStatus,
     CommentGetWithAllInfo,
+    CommentGetWithLike,
     CommentGetWithStatus,
     CommentImportAll,
     CommentPost,
@@ -162,18 +164,25 @@ async def import_comments(
     return result
 
 
-@comment.get("/{uuid}", response_model=CommentGet)
-async def get_comment(uuid: UUID) -> CommentGet:
+@comment.get("/{uuid}", response_model=CommentGetWithLike)
+async def get_comment(uuid: UUID, user=Depends(UnionAuth())) -> CommentGetWithLike:
     """
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
     comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
-    return CommentGet.model_validate(comment)
+    base_data = CommentGet.model_validate(comment)
+    return CommentGetWithLike(
+        **base_data.model_dump(),
+        is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE),
+        is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE),
+    )
 
 
-@comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
+@comment.get(
+    "", response_model=Union[CommentGetAll, CommentGetAllWithLike, CommentGetAllWithAllInfo, CommentGetAllWithStatus]
+)
 async def get_comments(
     limit: int = 10,
     offset: int = 0,
@@ -187,7 +196,7 @@ async def get_comments(
     unreviewed: bool = False,
     asc_order: bool = False,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)),
-) -> CommentGetAll:
+) -> Union[CommentGetAll, CommentGetAllWithLike, CommentGetAllWithAllInfo, CommentGetAllWithStatus]:
     """
      Scopes: `["rating.comment.review"]`
 
@@ -210,6 +219,7 @@ async def get_comments(
 
      `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
+
     comments_query = (
         Comment.query(session=db.session)
         .filter(Comment.search_by_lectorer_id(lecturer_id))
@@ -226,6 +236,7 @@ async def get_comments(
         )
     )
     comments = comments_query.limit(limit).offset(offset).all()
+    like = False
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
@@ -235,8 +246,13 @@ async def get_comments(
         result = CommentGetAllWithStatus(limit=limit, offset=offset, total=len(comments))
         comment_validator = CommentGetWithStatus
     else:
-        result = CommentGetAll(limit=limit, offset=offset, total=len(comments))
+        result = (
+            CommentGetAllWithLike(limit=limit, offset=offset, total=len(comments))
+            if user
+            else CommentGetAll(limit=limit, offset=offset, total=len(comments))
+        )
         comment_validator = CommentGet
+        like = True
 
     result.comments = comments
 
@@ -251,8 +267,26 @@ async def get_comments(
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
 
     result.total = len(result.comments)
-    result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
+    comments_with_like = []
+    current_user_id = user.get("id") if user else None
+    if current_user_id and result.comments:
+        user_reactions = Comment.reactions_for_comments(current_user_id, db.session, result.comments)
+    else:
+        user_reactions = {}
 
+    for comment in result.comments:
+        base_data = comment_validator.model_validate(comment)
+
+        if current_user_id:
+            reaction = user_reactions.get(comment.uuid)
+            comment_with_reactions = CommentGetWithLike(
+                **base_data.model_dump(), is_liked=reaction == Reaction.LIKE, is_disliked=reaction == Reaction.DISLIKE
+            )
+            comments_with_like.append(comment_with_reactions)
+        else:
+            comments_with_like.append(base_data)
+
+    result.comments = comments_with_like
     return result
 
 

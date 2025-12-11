@@ -248,6 +248,36 @@ class Comment(BaseDbModel):
         else:
             return cls.like_dislike_diff.desc()
 
+    @hybrid_method
+    def has_reaction(self, user_id: int, react: Reaction) -> bool:
+        return any(reaction.user_id == user_id and reaction.reaction == react for reaction in self.reactions)
+
+    @has_reaction.expression
+    def has_reaction(cls, user_id: int, react: Reaction):
+        return (
+            select([true()])
+            .where(
+                and_(
+                    CommentReaction.comment_uuid == cls.uuid,
+                    CommentReaction.user_id == user_id,
+                    CommentReaction.reaction == react,
+                )
+            )
+            .exists()
+        )
+
+    @classmethod
+    def reactions_for_comments(cls, user_id: int, session, comments):
+        if not user_id or not comments:
+            return {}
+        comments_uuid = [c.uuid for c in comments]
+        reactions = (
+            session.query(CommentReaction)
+            .filter(CommentReaction.user_id == user_id, CommentReaction.comment_uuid.in_(comments_uuid))
+            .all()
+        )
+        return {r.comment_uuid: r.reaction for r in reactions}
+
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
