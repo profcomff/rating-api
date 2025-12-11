@@ -36,9 +36,22 @@ class CommentGetWithStatus(CommentGet):
     review_status: ReviewStatus
 
 
+"""
+class CommentGetWithLikeAndStatus(CommentGetWithLike):
+    review_status: ReviewStatus
+"""
+
+
 class CommentGetWithAllInfo(CommentGet):
     review_status: ReviewStatus
     approved_by: int | None = None
+
+
+"""
+class CommentGetWithAllInfoAndLike(CommentGetWithLike):
+    review_status: ReviewStatus
+    approved_by: int | None = None
+"""
 
 
 class CommentUpdate(Base):
@@ -79,6 +92,13 @@ class CommentGetAll(Base):
     total: int
 
 
+class CommentGetAllWithLike(Base):
+    comments: list[CommentGetWithLike] = []
+    limit: int
+    offset: int
+    total: int
+
+
 class CommentGetAllWithStatus(Base):
     comments: list[CommentGetWithStatus] = []
     limit: int
@@ -86,11 +106,29 @@ class CommentGetAllWithStatus(Base):
     total: int
 
 
+"""
+class CommentGetAllWithStatusAndLike(Base):
+    comments: list[CommentGetWithLikeAndStatus] = []
+    limit: int
+    offset: int
+    total: int
+"""
+
+
 class CommentGetAllWithAllInfo(Base):
     comments: list[CommentGetWithAllInfo] = []
     limit: int
     offset: int
     total: int
+
+
+"""
+class CommentGetAllWithAllInfoAndLike(Base):
+    comments: list[CommentGetWithAllInfoAndLike] = []
+    limit: int
+    offset: int
+    total: int
+"""
 
 
 class LecturerUserCommentPost(Base):

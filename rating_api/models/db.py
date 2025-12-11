@@ -265,6 +265,18 @@ class Comment(BaseDbModel):
             .exists()
         )
 
+    @classmethod
+    def reactions_for_comments(cls, user_id: int, session, comments):
+        if not user_id or not comments:
+            return {}
+        comments_uuid = [c.uuid for c in comments]
+        reactions = (
+            session.query(CommentReaction)
+            .filter(CommentReaction.user_id == user_id, CommentReaction.comment_uuid.in_(comments_uuid))
+            .all()
+        )
+        return {r.comment_uuid: r.reaction for r in reactions}
+
 
 class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
