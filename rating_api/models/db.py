@@ -271,12 +271,16 @@ class Comment(BaseDbModel):
         if not user_id or not comments:
             return {}
         comments_uuid = [c.uuid for c in comments]
-        reactions = (
-            session.query(CommentReaction)
-            .filter(CommentReaction.user_id == user_id, CommentReaction.comment_uuid.in_(comments_uuid))
+        result = (
+            session.query(Comment.uuid, CommentReaction.reaction)
+            .join(
+                CommentReaction, and_(Comment.uuid == CommentReaction.comment_uuid, CommentReaction.user_id == user_id)
+            )
+            .filter(Comment.uuid.in_(comments_uuid))
+            .group_by(Comment.uuid, CommentReaction.reaction)
             .all()
         )
-        return {r.comment_uuid: r.reaction for r in reactions}
+        return dict(result)
 
 
 class LecturerUserComment(BaseDbModel):

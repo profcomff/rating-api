@@ -219,7 +219,7 @@ async def get_comments(
 
      `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
     """
-
+    user = {"id": 101, "session_scopes": []}  # тестовый user_id  # пустые скоупы = обычный пользователь
     comments_query = (
         Comment.query(session=db.session)
         .filter(Comment.search_by_lectorer_id(lecturer_id))
@@ -236,7 +236,6 @@ async def get_comments(
         )
     )
     comments = comments_query.limit(limit).offset(offset).all()
-    like = False
     if not comments:
         raise ObjectNotFound(Comment, 'all')
     if user and "rating.comment.review" in [scope['name'] for scope in user.get('session_scopes')]:
@@ -252,7 +251,6 @@ async def get_comments(
             else CommentGetAll(limit=limit, offset=offset, total=len(comments))
         )
         comment_validator = CommentGet
-        like = True
 
     result.comments = comments
 
