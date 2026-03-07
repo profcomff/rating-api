@@ -49,7 +49,7 @@ def test_get_lecturer_by_timetable_id(client, dbsession, lecturers, lecturer_n, 
     assert get_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         json_response = get_response.json()
-        assert json_response["id"] == Lecturer.id
+        assert json_response["id"] == lecturer.id
 
 
 @pytest.mark.parametrize(
