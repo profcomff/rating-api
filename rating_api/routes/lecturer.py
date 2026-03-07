@@ -93,7 +93,7 @@ async def update_lecturer_rating(
 @lecturer.get("/timetable-id/{timetable_id}", response_model=LecturerGet)
 async def get_lecturer_by_timetable_id(timetable_id: int) -> LecturerGet:
     """
-    Возвращает преподавателя по его ID в таблице timetable_id
+    Возвращает преподавателя по его timetable_id
     """
     lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.timetable_id == timetable_id).one_or_none()
     if lecturer is None:
