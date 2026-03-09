@@ -140,6 +140,23 @@ def comment(dbsession, lecturer):
 
 
 @pytest.fixture
+def comment_reaction(dbsession, comment):
+    created_reactions = []
+
+    def _create_reaction(user_id: int, react: Reaction):
+        reaction = CommentReaction(user_id=user_id, comment_uuid=comment.uuid, reaction=react)
+        dbsession.add(reaction)
+        dbsession.commit()
+        created_reactions.append(reaction)
+    
+    yield _create_reaction
+
+    for reaction in created_reactions:
+        dbsession.delete(reaction)
+    dbsession.commit()
+
+
+@pytest.fixture
 def unreviewed_comment(dbsession, lecturer):
     _comment = Comment(
         subject="test_subject",

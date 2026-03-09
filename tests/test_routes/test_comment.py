@@ -210,15 +210,12 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
         (None, None, None),  # anonymous
     ],
 )
-def test_get_comment_with_reaction(client, dbsession, comment, reaction_data, expected_reaction, comment_user_id):
+def test_get_comment_with_reaction(client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction):
     comment.user_id = comment_user_id
 
     if reaction_data:
         user_id, reaction_type = reaction_data
-        reaction = CommentReaction(user_id=user_id, comment_uuid=comment.uuid, reaction=reaction_type)
-        dbsession.add(reaction)
-
-    dbsession.commit()
+        comment_reaction(user_id, reaction_type)
 
     response_comment = client.get(f'{url}/{comment.uuid}')
 
