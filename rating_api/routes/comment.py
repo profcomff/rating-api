@@ -300,9 +300,7 @@ async def review_comment(
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)
-async def update_comment(uuid: UUID, comment_update: CommentUpdate, 
-                         user=Depends(UnionAuth())
-                         ) -> CommentGet:
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
     """Позволяет изменить свой неанонимный комментарий"""
     comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
 
