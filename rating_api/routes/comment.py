@@ -300,7 +300,9 @@ async def review_comment(
 
 
 @comment.patch("/{uuid}", response_model=CommentGet)
-async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
+async def update_comment(uuid: UUID, comment_update: CommentUpdate, 
+                         user=Depends(UnionAuth())
+                         ) -> CommentGet:
     """Позволяет изменить свой неанонимный комментарий"""
     comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
 
@@ -319,7 +321,10 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
         review_status=ReviewStatus.PENDING,
     )
 
-    return CommentGet.model_validate(updated_comment)
+    updated_comment = CommentGet.model_validate(updated_comment)
+    updated_comment.is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE)
+    updated_comment.is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE)
+    return updated_comment
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
@@ -384,11 +389,16 @@ async def like_comment(
         )
         .first()
     )
+    comment = CommentGet.model_validate(comment)
+    comment.is_liked = (reaction == Reaction.LIKE)
+    comment.is_disliked = (reaction == Reaction.DISLIKE)
 
     if existing_reaction and existing_reaction.reaction != reaction:
         new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)
     elif not existing_reaction:
         CommentReaction.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, reaction=reaction)
     else:
+        comment.is_disliked = False
+        comment.is_liked = False
         CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
-    return CommentGet.model_validate(comment)
+    return comment
