@@ -26,6 +26,8 @@ class CommentGet(Base):
     like_count: int
     dislike_count: int
     user_fullname: str | None = None
+    is_liked: bool = False
+    is_disliked: bool = False
 
 
 class CommentGetWithStatus(CommentGet):

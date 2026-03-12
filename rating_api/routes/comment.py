@@ -163,14 +163,18 @@ async def import_comments(
 
 
 @comment.get("/{uuid}", response_model=CommentGet)
-async def get_comment(uuid: UUID) -> CommentGet:
+async def get_comment(uuid: UUID, user=Depends(UnionAuth(auto_error=False, allow_none=False))) -> CommentGet:
     """
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
     comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
     if comment is None:
         raise ObjectNotFound(Comment, uuid)
-    return CommentGet.model_validate(comment)
+    base_data = CommentGet.model_validate(comment)
+    if user:
+        base_data.is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE)
+        base_data.is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE)
+    return base_data
 
 
 @comment.get("", response_model=Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus])
@@ -187,7 +191,7 @@ async def get_comments(
     unreviewed: bool = False,
     asc_order: bool = False,
     user=Depends(UnionAuth(scopes=["rating.comment.review"], auto_error=False, allow_none=False)),
-) -> CommentGetAll:
+) -> Union[CommentGetAll, CommentGetAllWithAllInfo, CommentGetAllWithStatus]:
     """
      Scopes: `["rating.comment.review"]`
 
@@ -251,8 +255,23 @@ async def get_comments(
         result.comments = [comment for comment in result.comments if comment.review_status is ReviewStatus.APPROVED]
 
     result.total = len(result.comments)
-    result.comments = [comment_validator.model_validate(comment) for comment in result.comments]
+    comments_with_like = []
+    current_user_id = user.get("id") if user else None
 
+    if current_user_id and result.comments:
+        user_reactions = Comment.reactions_for_comments(current_user_id, db.session, result.comments)
+    else:
+        user_reactions = {}
+
+    for comment in result.comments:
+        base_data = comment_validator.model_validate(comment)
+        if current_user_id:
+            reaction = user_reactions.get(comment.uuid)
+            base_data.is_liked = (reaction == Reaction.LIKE)
+            base_data.is_disliked = (reaction == Reaction.DISLIKE) 
+        comments_with_like.append(base_data)
+
+    result.comments = comments_with_like
     return result
 
 
@@ -300,7 +319,10 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
         review_status=ReviewStatus.PENDING,
     )
 
-    return CommentGet.model_validate(updated_comment)
+    updated_comment = CommentGet.model_validate(updated_comment)
+    updated_comment.is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE)
+    updated_comment.is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE)
+    return updated_comment
 
 
 @comment.delete("/{uuid}", response_model=StatusResponseModel)
@@ -365,11 +387,16 @@ async def like_comment(
         )
         .first()
     )
+    comment = CommentGet.model_validate(comment)
+    comment.is_liked = (reaction == Reaction.LIKE)
+    comment.is_disliked = (reaction == Reaction.DISLIKE)
 
     if existing_reaction and existing_reaction.reaction != reaction:
         new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)
     elif not existing_reaction:
         CommentReaction.create(session=db.session, user_id=user.get("id"), comment_uuid=comment.uuid, reaction=reaction)
     else:
+        comment.is_disliked = False
+        comment.is_liked = False
         CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
-    return CommentGet.model_validate(comment)
+    return comment
