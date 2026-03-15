@@ -29,6 +29,7 @@ def test_create_lecturer(client, dbsession, response_status):
         lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
         assert lecturer is None
 
+
 @pytest.mark.parametrize(
     'lecturer_n, response_status',
     [
@@ -377,7 +378,6 @@ def test_lecturer_rating_update(client, dbsession, body, response_status):
     response = client.patch('/lecturer/import_rating', json=[body])
 
     if response_status == status.HTTP_200_OK:
-
         response_dict = response.json()
         assert isinstance(response_dict, dict)
 

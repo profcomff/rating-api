@@ -148,7 +148,7 @@ def comment_reaction(dbsession, comment):
         dbsession.add(reaction)
         dbsession.commit()
         created_reactions.append(reaction)
-    
+
     yield _create_reaction
 
     for reaction in created_reactions:
