@@ -172,8 +172,8 @@ async def get_comment(uuid: UUID, user=Depends(UnionAuth(auto_error=False, allow
         raise ObjectNotFound(Comment, uuid)
     base_data = CommentGet.model_validate(comment)
     if user:
-        base_data.is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE)
-        base_data.is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE)
+        base_data.is_liked = comment.has_reaction(user.get("id"), Reaction.LIKE)
+        base_data.is_disliked = comment.has_reaction(user.get("id"), Reaction.DISLIKE)
     return base_data
 
 
@@ -267,8 +267,8 @@ async def get_comments(
         base_data = comment_validator.model_validate(comment)
         if current_user_id:
             reaction = user_reactions.get(comment.uuid)
-            base_data.is_liked = (reaction == Reaction.LIKE)
-            base_data.is_disliked = (reaction == Reaction.DISLIKE) 
+            base_data.is_liked = reaction == Reaction.LIKE
+            base_data.is_disliked = reaction == Reaction.DISLIKE
         comments_with_like.append(base_data)
 
     result.comments = comments_with_like
@@ -320,8 +320,8 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     )
 
     updated_comment = CommentGet.model_validate(updated_comment)
-    updated_comment.is_liked=comment.has_reaction(user.get("id"), Reaction.LIKE)
-    updated_comment.is_disliked=comment.has_reaction(user.get("id"), Reaction.DISLIKE)
+    updated_comment.is_liked = comment.has_reaction(user.get("id"), Reaction.LIKE)
+    updated_comment.is_disliked = comment.has_reaction(user.get("id"), Reaction.DISLIKE)
     return updated_comment
 
 
@@ -387,9 +387,9 @@ async def like_comment(
         )
         .first()
     )
-    
-    comment.is_liked = (reaction == Reaction.LIKE)
-    comment.is_disliked = (reaction == Reaction.DISLIKE)
+
+    comment.is_liked = reaction == Reaction.LIKE
+    comment.is_disliked = reaction == Reaction.DISLIKE
 
     if existing_reaction and existing_reaction.reaction != reaction:
         new_reaction = CommentReaction.update(session=db.session, id=existing_reaction.uuid, reaction=reaction)

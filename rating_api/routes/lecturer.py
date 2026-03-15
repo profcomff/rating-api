@@ -90,6 +90,7 @@ async def update_lecturer_rating(
 
     return response_validated
 
+
 @lecturer.get("/timetable-id/{timetable_id}", response_model=LecturerGet)
 async def get_lecturer_by_timetable_id(timetable_id: int) -> LecturerGet:
     """

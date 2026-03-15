@@ -29,6 +29,7 @@ def test_create_lecturer(client, dbsession, response_status):
         lecturer = dbsession.query(Lecturer).filter(Lecturer.timetable_id == 0).one_or_none()
         assert lecturer is None
 
+
 @pytest.mark.parametrize(
     'lecturer_n, response_status',
     [

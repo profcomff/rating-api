@@ -210,7 +210,9 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
         (None, None, None),  # anonymous
     ],
 )
-def test_get_comment_with_reaction(client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction):
+def test_get_comment_with_reaction(
+    client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction
+):
     comment.user_id = comment_user_id
 
     if reaction_data:
