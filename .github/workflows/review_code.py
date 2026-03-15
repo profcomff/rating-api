@@ -431,7 +431,6 @@ def create_review_with_comments(file_comments, commit_id):
 
     valid_review_comments = []
     for comment in review_comments:
-
         if "path" not in comment or "position" not in comment or comment["position"] is None:
             print(
                 f"Пропускаем невалидный комментарий к файлу {comment.get('path', 'неизвестный')}: отсутствует позиция"
