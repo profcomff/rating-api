@@ -387,7 +387,7 @@ async def like_comment(
         )
         .first()
     )
-    comment = CommentGet.model_validate(comment)
+    
     comment.is_liked = (reaction == Reaction.LIKE)
     comment.is_disliked = (reaction == Reaction.DISLIKE)
 
@@ -399,4 +399,4 @@ async def like_comment(
         comment.is_disliked = False
         comment.is_liked = False
         CommentReaction.delete(session=db.session, id=existing_reaction.uuid)
-    return comment
+    return CommentGet.model_validate(comment)
