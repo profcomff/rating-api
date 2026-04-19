@@ -39,8 +39,9 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 @comment.post("", response_model=CommentGet)
 async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
     """
+    Scopes: `["rating.comment.create"]`
+
     Создает комментарий к преподавателю в базе данных RatingAPI
-    Для создания комментария нужно быть авторизованным
     """
     # Проверяем, что лектор с заданным id существует
     Lecturer.get(session=db.session, id=lecturer_id)
@@ -148,6 +149,7 @@ async def import_comments(
 ) -> CommentGetAll:
     """
     Scopes: `["rating.comment.import"]`
+
     Создает комментарии в базе данных RatingAPI
     """
     number_of_comments = len(comments_info.comments)
@@ -165,6 +167,8 @@ async def import_comments(
 @comment.get("/{uuid}", response_model=CommentGet)
 async def get_comment(uuid: UUID, user=Depends(UnionAuth(auto_error=False, allow_none=False))) -> CommentGet:
     """
+    Scopes: `["rating.comment.read"]`
+
     Возвращает комментарий по его UUID в базе данных RatingAPI
     """
     comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
@@ -301,7 +305,11 @@ async def review_comment(
 
 @comment.patch("/{uuid}", response_model=CommentGet)
 async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends(UnionAuth())) -> CommentGet:
-    """Позволяет изменить свой неанонимный комментарий"""
+    """
+    Scopes: `["rating.comment.update"]`
+
+    Позволяет изменить свой неанонимный комментарий
+    """
     comment: Comment = Comment.get(session=db.session, id=uuid)  # Ошибка, если не найден
 
     if comment.user_id != user.get("id") or comment.user_id is None:
@@ -358,22 +366,9 @@ async def like_comment(
     user=Depends(UnionAuth()),
 ) -> CommentGet:
     """
-    Handles like/dislike reactions for a comment.
+    Scopes: `["rating.comment.write"]`
 
-    This endpoint allows authenticated users to react to a comment (like/dislike) or change their existing reaction.
-    If the user has no existing reaction, a new one is created. If the user changes their reaction, it gets updated.
-    If the user clicks the same reaction again, the reaction is removed.
-
-    Args:
-        uuid (UUID): The UUID of the comment to react to.
-        reaction (Reaction): The reaction type (like/dislike).
-        user (dict): Authenticated user data from UnionAuth dependency.
-
-    Returns:
-        CommentGet: The updated comment with reactions in CommentGet format.
-
-    Raises:
-        ObjectNotFound: If the comment with given UUID doesn't exist.
+    Ставит лайк или дизлайк на комментарий по его uuid
     """
     comment = Comment.get(session=db.session, id=uuid)
     if not comment:

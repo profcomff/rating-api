@@ -212,6 +212,8 @@ async def update_lecturer(
 ) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.update"]`
+
+    Обновляет данные о преподавателе по его id
     """
     lecturer = Lecturer.get(id, session=db.session)
     if lecturer is None:
@@ -238,6 +240,8 @@ async def delete_lecturer(
 ):
     """
     Scopes: `["rating.lecturer.delete"]`
+    
+    Удаляет из базы данных преподавателя по его id
     """
     check_lecturer = Lecturer.get(session=db.session, id=id)
     if check_lecturer is None:
