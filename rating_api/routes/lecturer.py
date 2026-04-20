@@ -36,7 +36,7 @@ async def create_lecturer(
 
     Создает преподавателя в базе данных RatingAPI
 
-    Исключение **AlreadyExists**, если преподаватель с введеным `timetable_id` уже существует 
+    Исключение **AlreadyExists**, если преподаватель с введеным `timetable_id` уже существует
     """
     get_lecturer: Lecturer = (
         Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
