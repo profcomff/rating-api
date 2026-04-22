@@ -34,7 +34,9 @@ async def create_lecturer(
     """
     Scopes: `["rating.lecturer.create"]`
 
-    Создает преподавателя в базе данных RatingAPI
+    Создает преподавателя в базе данных
+
+    Исключение **AlreadyExists**, если преподаватель с введеным `timetable_id` уже существует
     """
     get_lecturer: Lecturer = (
         Lecturer.query(session=db.session).filter(Lecturer.timetable_id == lecturer_info.timetable_id).one_or_none()
@@ -54,7 +56,7 @@ async def update_lecturer_rating(
     """
     Scopes: `["rating.lecturer.update_rating"]`
 
-    Обновляет рейтинг преподавателя в базе данных RatingAPI
+    Обновляет рейтинг преподавателя в базе данных
     """
     updated_lecturers = []
     response = {
@@ -95,6 +97,8 @@ async def update_lecturer_rating(
 async def get_lecturer_by_timetable_id(timetable_id: int) -> LecturerGet:
     """
     Возвращает преподавателя по его timetable_id
+
+    Исключение **ObjectNotFound**, если `timetable_id` не найден
     """
     lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.timetable_id == timetable_id).one_or_none()
     if lecturer is None:
@@ -107,11 +111,13 @@ async def get_lecturer(id: int, info: list[Literal["comments"]] = Query(default=
     """
     Scopes: `["rating.lecturer.read"]`
 
-    Возвращает преподавателя по его ID в базе данных RatingAPI
+    Возвращает преподавателя по его ID в базе данных
 
     *QUERY* `info: string` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Subject лектора возвращшается либо из базы данных, либо из любого аппрувнутого комментария
+    Subject лектора возвращается либо из базы данных, либо из любого аппрувнутого комментария
+
+    Исключение **ObjectNotFound**, если `id` не найден
     """
     lecturer: Lecturer = Lecturer.query(session=db.session).filter(Lecturer.id == id).one_or_none()
     if lecturer is None:
@@ -168,6 +174,8 @@ async def get_lecturers(
     `mark`
     Поле для оценки. Если передано, то возвращает только тех преподавателей, для которых средняя общая оценка ('general_mark')
     больше, чем переданный 'mark'.
+
+    Исключение **ObjectNotFound**, если преподаватель с введенными параметрами не найден
     """
     lecturers_query = lecturer_filter.filter(
         Lecturer.query(session=db.session).outerjoin(Lecturer.comments).group_by(Lecturer.id)
@@ -212,6 +220,10 @@ async def update_lecturer(
 ) -> LecturerGet:
     """
     Scopes: `["rating.lecturer.update"]`
+
+    Обновляет данные о преподавателе по его id
+
+    Исключение **ObjectNotFound**, если `id` не найден
     """
     lecturer = Lecturer.get(id, session=db.session)
     if lecturer is None:
@@ -238,6 +250,10 @@ async def delete_lecturer(
 ):
     """
     Scopes: `["rating.lecturer.delete"]`
+
+    Удаляет из базы данных преподавателя по его id
+
+    Исключение **ObjectNotFound**, если `id` не найден
     """
     check_lecturer = Lecturer.get(session=db.session, id=id)
     if check_lecturer is None:
