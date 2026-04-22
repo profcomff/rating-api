@@ -43,7 +43,11 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     Создает комментарий к преподавателю в базе данных RatingAPI
 
-    Исключение **TooManyCommentsToLecturer**, если число комментариев превысило лимит
+    Комментарий создается со статусом PENDING (на модерации)
+
+    Исключение **TooManyCommentRequests**, если число комментариев превысило общий лимит
+
+    Исключение **TooManyCommentsToLecturer**, если число комментариев превысило лимит для лектора
 
     Исключение **CommentTooLong**, если комментарий слишком длинный
 
@@ -157,6 +161,8 @@ async def import_comments(
     Scopes: `["rating.comment.import"]`
 
     Создает комментарии в базе данных RatingAPI
+
+    Не выбрасывает исключения
     """
     number_of_comments = len(comments_info.comments)
     result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
@@ -176,6 +182,8 @@ async def get_comment(uuid: UUID, user=Depends(UnionAuth(auto_error=False, allow
     Scopes: `["rating.comment.read"]`
 
     Возвращает комментарий по его UUID в базе данных RatingAPI
+
+    Если пользователь авторизован, добавляются флаги is_liked/is_disliked (реакция пользователя на комментарий)
 
     Исключение **ObjectNotFound**, если `uuid` не найден
     """
@@ -225,6 +233,11 @@ async def get_comments(
      `unreviewed` - вернет все непроверенные комментарии, если True. По дефолту False.
 
      `asc_order` -Если передано true, сортировать в порядке возрастания. Иначе - в порядке убывания
+
+     Разные модели ответа в зависимости от прав пользователя:
+     CommentGetAllWithAllInfo: для модераторов (со статусом комментария);
+     CommentGetAllWithStatus: для авторов комментариев (со статусом);
+     CommentGetAll: для всех остальных (только одобренные комментарии)
 
      Исключение **ObjectNotFound**, если комментарий с введенными параметрами не найден
 
@@ -305,6 +318,10 @@ async def review_comment(
     `approved` - комментарий одобрен и возвращается при запросе лектора
     `dismissed` - комментарий отклонен, не отображается в запросе лектора
 
+    Комментарий может быть либо одобрен, либо отклонен
+
+    Отклоненные комментарии не отображаются в обычных GET-запросах(можно посмотреть только через `uuid`)
+
     Исключение **ObjectNotFound**, если `uuid` не найден
     """
     check_comment: Comment = Comment.query(session=db.session).filter(Comment.uuid == uuid).one_or_none()
@@ -323,6 +340,8 @@ async def update_comment(uuid: UUID, comment_update: CommentUpdate, user=Depends
     Scopes: `["rating.comment.update"]`
 
     Позволяет изменить свой неанонимный комментарий
+
+    После редактирования комментарий снова отправляется на модерацию
 
     Исключение **ForbiddenAction** при попытке отредактировать чужой комментарий
 
@@ -361,6 +380,12 @@ async def delete_comment(
 
     Удаляет комментарий по его UUID в базе данных RatingAPI
 
+    Модератор может удалить любой комментарий
+
+    Обычный пользователь может удалить только свой неанонимный комментарий
+
+    Анонимные комментарии может удалить только модератор
+
     Исключение **ObjectNotFound**, если `uuid` не найден
 
     Исключение **ForbiddenAction** при попытке удалить комментарий пользователем без прав
@@ -391,6 +416,13 @@ async def like_comment(
     Scopes: `["rating.comment.write"]`
 
     Ставит лайк или дизлайк на комментарий по его uuid
+
+    Дизлайка и лайка не может быть одновременно
+
+    Если реакции от пользователя на этот комментарий не было — создается новая;
+    Если была противоположная реакция — она заменяется на новую;
+    Если была такая же реакция — она удаляется;
+    После операции поля is_liked/is_disliked в ответе отражают итоговое состояние
 
     Исключение **ObjectNotFound**, если `uuid` не найден
     """
