@@ -160,9 +160,7 @@ async def import_comments(
     """
     Scopes: `["rating.comment.import"]`
 
-    Создает комментарии в базе данных RatingAPI
-
-    Не выбрасывает исключения
+    Создает комментарии в базе данных
     """
     number_of_comments = len(comments_info.comments)
     result = CommentGetAll(limit=number_of_comments, offset=number_of_comments, total=number_of_comments)
