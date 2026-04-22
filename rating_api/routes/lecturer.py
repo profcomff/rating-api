@@ -34,7 +34,7 @@ async def create_lecturer(
     """
     Scopes: `["rating.lecturer.create"]`
 
-    Создает преподавателя в базе данных RatingAPI
+    Создает преподавателя в базе данных
 
     Исключение **AlreadyExists**, если преподаватель с введеным `timetable_id` уже существует
     """
@@ -56,7 +56,7 @@ async def update_lecturer_rating(
     """
     Scopes: `["rating.lecturer.update_rating"]`
 
-    Обновляет рейтинг преподавателя в базе данных RatingAPI
+    Обновляет рейтинг преподавателя в базе данных
     """
     updated_lecturers = []
     response = {
@@ -111,11 +111,11 @@ async def get_lecturer(id: int, info: list[Literal["comments"]] = Query(default=
     """
     Scopes: `["rating.lecturer.read"]`
 
-    Возвращает преподавателя по его ID в базе данных RatingAPI
+    Возвращает преподавателя по его ID в базе данных
 
     *QUERY* `info: string` - возможные значения `'comments'`.
     Если передано `'comments'`, то возвращаются одобренные комментарии к преподавателю.
-    Subject лектора возвращшается либо из базы данных, либо из любого аппрувнутого комментария
+    Subject лектора возвращается либо из базы данных, либо из любого аппрувнутого комментария
 
     Исключение **ObjectNotFound**, если `id` не найден
     """
