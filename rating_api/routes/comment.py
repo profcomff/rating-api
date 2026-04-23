@@ -7,7 +7,6 @@ import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
-from starlette.requests import Request
 
 from rating_api.exceptions import (
     CommentTooLong,
@@ -39,7 +38,7 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 @comment.post("", response_model=CommentGet)
 async def create_comment(
-    lecturer_id: int, comment_info: CommentPost, request: Request, user=Depends(UnionAuth(enable_userdata=True))
+    lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth(enable_userdata=True))
 ) -> CommentGet:
     """
     Scopes: `["rating.comment.create"]`
@@ -115,18 +114,19 @@ async def create_comment(
     )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
+
     full_name = None
     if not comment_info.is_anonymous:
         userdata_info = user.get("userdata")
-        full_name_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
-        full_name = full_name_info[0]["value"] if len(full_name_info) != 0 else None
+        fullname_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
+        fullname = fullname_info[0]["value"] if len(fullname_info) != 0 else None
 
     new_comment = Comment.create(
         session=db.session,
         **comment_info.model_dump(exclude={"is_anonymous"}),
         lecturer_id=lecturer_id,
         user_id=user_id,
-        user_fullname=full_name,
+        user_fullname=fullname,
         review_status=ReviewStatus.PENDING,
     )
 
