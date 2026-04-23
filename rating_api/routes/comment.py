@@ -115,7 +115,7 @@ async def create_comment(
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
 
-    full_name = None
+    fullname = None
     if not comment_info.is_anonymous:
         userdata_info = user.get("userdata")
         fullname_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
