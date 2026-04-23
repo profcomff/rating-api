@@ -7,6 +7,7 @@ import aiohttp
 from auth_lib.fastapi import UnionAuth
 from fastapi import APIRouter, Depends, Query
 from fastapi_sqlalchemy import db
+from starlette.requests import Request
 
 from rating_api.exceptions import (
     CommentTooLong,
@@ -37,7 +38,7 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
+async def create_comment(lecturer_id: int, comment_info: CommentPost, request: Request, user=Depends(UnionAuth())) -> CommentGet:
     """
     Scopes: `["rating.comment.create"]`
 
@@ -115,9 +116,23 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     fullname = None
     if not comment_info.is_anonymous:
-        userdata_info = user.get("userdata", [])
-        fullname_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
-        fullname = fullname_info[0]["value"] if len(fullname_info) != 0 else None
+        token = request.headers.get("Authorization")
+        if token:
+            try:
+                auth = UnionAuth()
+                user_data = auth._get_userdata(token, user_id)
+                
+                if user_data and "items" in user_data:
+                    for item in user_data["items"]:
+                        if "Полное имя" in item:
+                            fullname = item["Полное имя"]
+                            break
+            except Exception:
+                pass
+
+        if not fullname:
+            raise ForbiddenAction(Comment)
+
 
     new_comment = Comment.create(
         session=db.session,
