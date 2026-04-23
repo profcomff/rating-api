@@ -38,7 +38,9 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(lecturer_id: int, comment_info: CommentPost, request: Request, user=Depends(UnionAuth())) -> CommentGet:
+async def create_comment(
+    lecturer_id: int, comment_info: CommentPost, request: Request, user=Depends(UnionAuth(enable_userdata=True))
+) -> CommentGet:
     """
     Scopes: `["rating.comment.create"]`
 
@@ -113,33 +115,18 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, request: R
     )
     # Обрабатываем анонимность комментария, и удаляем этот флаг чтобы добавить запись в БД
     user_id = None if comment_info.is_anonymous else user.get('id')
-
-    fullname = None
+    full_name = None
     if not comment_info.is_anonymous:
-        token = request.headers.get("Authorization")
-        if token:
-            try:
-                auth = UnionAuth()
-                user_data = auth._get_userdata(token, user_id)
-                
-                if user_data and "items" in user_data:
-                    for item in user_data["items"]:
-                        if "Полное имя" in item:
-                            fullname = item["Полное имя"]
-                            break
-            except Exception:
-                pass
-
-        if not fullname:
-            raise ForbiddenAction(Comment)
-
+        userdata_info = user.get("userdata")
+        full_name_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
+        full_name = full_name_info[0]["value"] if len(full_name_info) != 0 else None
 
     new_comment = Comment.create(
         session=db.session,
         **comment_info.model_dump(exclude={"is_anonymous"}),
         lecturer_id=lecturer_id,
         user_id=user_id,
-        user_fullname=fullname,
+        user_fullname=full_name,
         review_status=ReviewStatus.PENDING,
     )
 
