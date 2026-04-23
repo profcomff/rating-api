@@ -37,7 +37,9 @@ comment = APIRouter(prefix="/comment", tags=["Comment"])
 
 
 @comment.post("", response_model=CommentGet)
-async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth())) -> CommentGet:
+async def create_comment(
+    lecturer_id: int, comment_info: CommentPost, user=Depends(UnionAuth(enable_userdata=True))
+) -> CommentGet:
     """
     Scopes: `["rating.comment.create"]`
 
@@ -115,7 +117,7 @@ async def create_comment(lecturer_id: int, comment_info: CommentPost, user=Depen
 
     fullname = None
     if not comment_info.is_anonymous:
-        userdata_info = user.get("userdata", [])
+        userdata_info = user.get("userdata")
         fullname_info = list(filter(lambda x: "Полное имя" == x['param'], userdata_info))
         fullname = fullname_info[0]["value"] if len(fullname_info) != 0 else None
 
