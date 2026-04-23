@@ -22,11 +22,16 @@ class Settings(BaseSettings):
     CORS_ALLOW_HEADERS: list[str] = ['*']
     MAX_COMMENT_LENGTH: int = 3000
 
-    '''Temp settings'''
+    APP_ENV: str = os.getenv("APP_ENV", "dev")  # Can be "dev", "test", or "prod"
 
+    PROD_API_URL: str = "https://api.profcomff.com/"
+    TEST_API_URL: str = "https://api.test.profcomff.com/"
+    ACHIEVEMENT_GIVE_TOKEN: str = os.getenv("ACHIEVEMENT_API", "")
+
+    '''Temp settings'''
     API_URL: str = "https://api.test.profcomff.com/"
-    FIRST_COMMENT_ACHIEVEMENT_ID: int = 12
-    ACHIEVEMENT_GIVE_TOKEN: str = ""
+    FIRST_COMMENT_ACHIEVEMENT_ID_TEST: int = 48
+    FIRST_COMMENT_ACHIEVEMENT_ID_PROD: int = 12
 
     model_config = ConfigDict(case_sensitive=True, env_file=".env", extra="ignore")
 
