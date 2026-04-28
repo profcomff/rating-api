@@ -197,7 +197,7 @@ class Comment(BaseDbModel):
     def like_count(cls):
         """SQL выражение для подсчета лайков"""
         return (
-            select(func.count(CommentReaction.uuid))
+            select(func.coalesce(func.count(CommentReaction.uuid), 0))
             .where(and_(CommentReaction.comment_uuid == cls.uuid, CommentReaction.reaction == Reaction.LIKE))
             .label('like_count')
         )
@@ -211,7 +211,7 @@ class Comment(BaseDbModel):
     def dislike_count(cls):
         """SQL выражение для подсчета дизлайков"""
         return (
-            select(func.count(CommentReaction.uuid))
+            select(func.coalesce(func.count(CommentReaction.uuid), 0))
             .where(and_(CommentReaction.comment_uuid == cls.uuid, CommentReaction.reaction == Reaction.DISLIKE))
             .label('dislike_count')
         )
@@ -228,12 +228,15 @@ class Comment(BaseDbModel):
         """SQL выражение для вычисления разницы лайков/дизлайков"""
         return (
             select(
-                func.sum(
-                    case(
-                        (CommentReaction.reaction == Reaction.LIKE, 1),
-                        (CommentReaction.reaction == Reaction.DISLIKE, -1),
-                        else_=0,
-                    )
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (CommentReaction.reaction == Reaction.LIKE, 1),
+                            (CommentReaction.reaction == Reaction.DISLIKE, -1),
+                            else_=0,
+                        )
+                    ),
+                    0,
                 )
             )
             .where(CommentReaction.comment_uuid == cls.uuid)
@@ -243,10 +246,8 @@ class Comment(BaseDbModel):
     @hybrid_method
     def order_by_like_diff(cls, asc_order: bool = False):
         """Метод для сортировки по разнице лайков/дизлайков"""
-        if asc_order:
-            return cls.like_dislike_diff.asc()
-        else:
-            return cls.like_dislike_diff.desc()
+        # Primary ordering: like-dislike diff (coalesced to 0)
+        return cls.like_dislike_diff.asc() if asc_order else cls.like_dislike_diff.desc()
 
     @hybrid_method
     def has_reaction(self, user_id: int, react: Reaction) -> bool:
