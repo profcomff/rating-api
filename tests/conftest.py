@@ -10,8 +10,10 @@ from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+
 from sqlalchemy import event
 from fastapi_sqlalchemy import db
+
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
@@ -19,6 +21,7 @@ from rating_api.models.db import *
 from rating_api.routes import app
 from rating_api.settings import Settings, get_settings
 
+from auth_lib.fastapi import UnionAuth
 
 class PostgresConfig:
     """Дата-класс со значениями для контейнера с тестовой БД и alembic-миграции."""
@@ -116,16 +119,47 @@ def override_dbsession_in_route(dbsession, mocker):
 
 
 @pytest.fixture
-def client(mocker):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
-    user_mock.return_value = {
-        "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
-        "groups": [{"id": 0, "name": "string", "parent_id": 0}],
-        "id": 0,
-        "email": "string",
-    }
+def authlib_user():
+    """Данные о пользователе, возвращаемые сервисом auth.
+    """
+    return {"auth_methods":["email","github_auth"],
+            "session_scopes":[
+                {"id":145,"name":"auth.session.create"},
+                {"id":146,"name":"auth.session.update"},
+                {"id":165,"name":"auth.user.selfdelete"}
+                ],
+            "user_scopes":[
+                {"id":145,"name":"auth.session.create"},
+                {"id":146,"name":"auth.session.update"},
+                {"id":165,"name":"auth.user.selfdelete"}
+                ],
+            "indirect_groups":[99],
+            "groups":[99],
+            "id":0,
+            "email":"aslimbo2001@gmail.com",
+            "userdata":[
+                {"category":"Личная информация","param":"Полное имя","value":"Namazov Maksim"},
+                {"category":"Личная информация","param":"Фото","value":"https://avatars.githubusercontent.com/u/192724282?v=4"},
+                {"category":"Контакты","param":"Имя пользователя GitHub","value":"CaseAsLimbo"}
+                ]
+           }
+    
+
+
+@pytest.fixture()
+def authlib_mock(mocker):
+    auth_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__")
+    return auth_mock
+
+
+@pytest.fixture()
+def user_mock(authlib_mock, authlib_user):
+    auth_mock = authlib_mock.return_value = authlib_user
+    return auth_mock
+
+
+@pytest.fixture
+def client(mocker, user_mock):
     client = TestClient(app)
     return client
 
