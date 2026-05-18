@@ -50,6 +50,7 @@ class Lecturer(BaseDbModel):
     avatar_link: Mapped[str] = mapped_column(String, nullable=True, comment="Ссылка на аву препода")
     timetable_id: Mapped[int]
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
+    lecturer_user_comments: Mapped[list[LecturerUserComment]] = relationship("LecturerUserComment", back_populates="lecturer_comments", cascade="all, delete-orphan")
     mark_weighted: Mapped[float] = mapped_column(
         Float,
         nullable=False,
@@ -288,6 +289,7 @@ class LecturerUserComment(BaseDbModel):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     lecturer_id: Mapped[int] = mapped_column(Integer, ForeignKey("lecturer.id"))
+    lecturer_comments: Mapped[Lecturer] = relationship("Lecturer", back_populates="lecturer_user_comments")
     create_ts: Mapped[datetime.datetime] = mapped_column(
         DateTime, default=datetime.datetime.now(datetime.timezone.utc), nullable=False
     )
