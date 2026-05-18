@@ -10,6 +10,8 @@ from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
+from sqlalchemy import event
+from fastapi_sqlalchemy import db
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
@@ -89,6 +91,28 @@ def dbsession(db_container):
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
     yield session
+
+
+@pytest.fixture()
+def logging_sql_req_before_execute(dbsession):
+    """
+    Фикстура для логирования всех сформированных в рамках одной транзакции
+    SQL-запросов, до их отправки в бд, то есть до Session.flush() или 
+    до Session.commit().
+    """
+    engine = dbsession.get_bind()
+    @event.listens_for(engine, "before_execute", named=True)
+    def sql_requests_listener(**kw_entities_of_executing):
+        print("\n========= SQL command =========\n")
+        print(f"SQL was sended: {kw_entities_of_executing.get("clauseelement")}\n")
+        print("===============================\n")
+    
+
+
+@pytest.fixture()
+def override_dbsession_in_route(dbsession, mocker):
+    "Мок для подмены db.session в ручке на тестовую сессию dbsession"
+    mocker.patch.object(db.__class__, "session", property(lambda self: dbsession))
 
 
 @pytest.fixture
@@ -214,11 +238,9 @@ def lecturers(dbsession):
         Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
     )
     lecturers[-1].is_deleted = True
-    for lecturer in lecturers:
-        dbsession.add(lecturer)
+    dbsession.add_all(lecturers)
     dbsession.commit()
     yield lecturers
-
     for lecturer in lecturers:
         for row in lecturer.comments:
             dbsession.delete(row)
