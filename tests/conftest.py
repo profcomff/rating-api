@@ -114,13 +114,16 @@ def logging_sql_req_before_execute(dbsession):
 
 @pytest.fixture()
 def override_dbsession_in_route(dbsession, mocker):
-    "Мок для подмены db.session в ручке на тестовую сессию dbsession"
+    """
+    Мок для подмены db.session в ручке на тестовую сессию dbsession
+    """
     mocker.patch.object(db.__class__, "session", property(lambda self: dbsession))
 
 
 @pytest.fixture
 def authlib_user():
-    """Данные о пользователе, возвращаемые сервисом auth.
+    """
+    Данные о пользователе, возвращаемые сервисом auth.
     """
     return {"auth_methods":["email","github_auth"],
             "session_scopes":[
@@ -154,8 +157,8 @@ def authlib_mock(mocker):
 
 @pytest.fixture()
 def user_mock(authlib_mock, authlib_user):
-    auth_mock = authlib_mock.return_value = authlib_user
-    return auth_mock
+    authlib_mock.return_value = authlib_user
+    return authlib_mock
 
 
 @pytest.fixture
