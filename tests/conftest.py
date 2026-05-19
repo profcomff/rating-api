@@ -9,8 +9,7 @@ from _pytest.monkeypatch import MonkeyPatch
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
-from fastapi_sqlalchemy import db
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
@@ -90,48 +89,6 @@ def dbsession(db_container):
     TestingSessionLocal = sessionmaker(bind=engine)
     session = TestingSessionLocal()
     yield session
-
-
-@pytest.fixture()
-def logging_sql_req_before_execute(dbsession):
-    """
-    Фикстура для логирования всех сформированных в рамках одной транзакции
-    SQL-запросов, до их отправки в бд, то есть до Session.flush() или
-    до Session.commit(), а так же событий сессии BEGIN, COMMIT и ROLLBACK
-    """
-    engine = dbsession.get_bind()
-
-    @event.listens_for(engine, "before_execute", named=True)
-    def sql_requests_listener(**kw_entities_of_executing):
-        print("\n========= SQL command =========\n")
-        print(f"SQL was sended: {kw_entities_of_executing.get('clauseelement')}\n")
-        print("===============================\n")
-
-    @event.listens_for(dbsession, "after_begin", named=True)
-    def begin_listener(**kw):
-        print("\n========= BEGIN =========\n")
-        print(f"BEGIN was executed\n")
-        print("===============================\n")
-
-    @event.listens_for(dbsession, "after_rollback", named=True)
-    def begin_listener(**kw):
-        print("\n========= ROLLBACK =========\n")
-        print(f"ROLLBACK was executed\n")
-        print("===============================\n")
-
-    @event.listens_for(dbsession, "after_commit", named=True)
-    def begin_listener(**kw):
-        print("\n========= COMMIT =========\n")
-        print(f"COMMIT was executed\n")
-        print("===============================\n")
-
-
-@pytest.fixture()
-def override_dbsession_in_route(dbsession, mocker):
-    """
-    Мок для подмены db.session в ручке на тестовую сессию dbsession
-    """
-    mocker.patch.object(db.__class__, "session", property(lambda self: dbsession))
 
 
 @pytest.fixture
