@@ -7,6 +7,7 @@ from starlette import status
 from rating_api.models import Comment, CommentReaction, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.settings import get_settings
 
+from auth_lib.fastapi import UnionAuth
 
 logger = logging.getLogger(__name__)
 url: str = '/comment'
@@ -177,6 +178,14 @@ settings = get_settings()
 def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
+    
+    # Проверка корректности переданных в userdata "param"
+    user = UnionAuth.__call__(post_response)
+    acceptable_params = ["Полное имя", "Фото", "Имя пользователя GitHub", "Номер Телефона"]
+    real_params = [i["param"] for i in user.get("userdata")]
+    for i in real_params:
+        assert i in acceptable_params, f"Не допустимый параметр: \"{i}\"! Список допустимых параметров: {acceptable_params}"
+
     assert post_response.status_code == response_status
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
