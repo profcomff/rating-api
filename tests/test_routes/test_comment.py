@@ -183,9 +183,9 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
     user = UnionAuth.__call__(post_response)
     acceptable_params = ["Полное имя", "Фото", "Имя пользователя GitHub", "Номер Телефона"]
     real_params = [i["param"] for i in user.get("userdata")]
-    for i in real_params:
+    for param in real_params:
         assert (
-            i in acceptable_params
+            param in acceptable_params
         ), f"Не допустимый параметр: \"{i}\"! Список допустимых параметров: {acceptable_params}"
 
     assert post_response.status_code == response_status
