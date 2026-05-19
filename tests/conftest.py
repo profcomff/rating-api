@@ -92,16 +92,46 @@ def dbsession(db_container):
 
 
 @pytest.fixture
-def client(mocker):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
-    user_mock.return_value = {
-        "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
-        "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
-        "groups": [{"id": 0, "name": "string", "parent_id": 0}],
+def authlib_user():
+    """
+    Данные о пользователе, возвращаемые сервисом auth.
+    """
+    return {
+        "auth_methods": ["email", "github_auth"],
+        "session_scopes": [
+            {"id": 145, "name": "auth.session.create"},
+            {"id": 146, "name": "auth.session.update"},
+            {"id": 165, "name": "auth.user.selfdelete"},
+        ],
+        "user_scopes": [
+            {"id": 145, "name": "auth.session.create"},
+            {"id": 146, "name": "auth.session.update"},
+            {"id": 165, "name": "auth.user.selfdelete"},
+        ],
+        "indirect_groups": [99],
+        "groups": [99],
         "id": 0,
-        "email": "string",
+        "email": "aslimbo2001@gmail.com",
+        "userdata": [
+            {"category": "Личная информация", "param": "Полное имя", "value": "Тестовый Тест"},
+        ],
     }
+
+
+@pytest.fixture()
+def authlib_mock(mocker):
+    auth_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__")
+    return auth_mock
+
+
+@pytest.fixture()
+def user_mock(authlib_mock, authlib_user):
+    authlib_mock.return_value = authlib_user
+    return authlib_mock
+
+
+@pytest.fixture
+def client(mocker, user_mock):
     client = TestClient(app)
     return client
 
@@ -214,11 +244,9 @@ def lecturers(dbsession):
         Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
     )
     lecturers[-1].is_deleted = True
-    for lecturer in lecturers:
-        dbsession.add(lecturer)
+    dbsession.add_all(lecturers)
     dbsession.commit()
     yield lecturers
-
     for lecturer in lecturers:
         for row in lecturer.comments:
             dbsession.delete(row)
