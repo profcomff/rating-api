@@ -156,13 +156,7 @@ def authlib_user():
         "id": 0,
         "email": "aslimbo2001@gmail.com",
         "userdata": [
-            {"category": "Личная информация", "param": "Полное имя", "value": "Namazov Maksim"},
-            {
-                "category": "Личная информация",
-                "param": "Фото",
-                "value": "https://avatars.githubusercontent.com/u/192724282?v=4",
-            },
-            {"category": "Контакты", "param": "Имя пользователя GitHub", "value": "CaseAsLimbo"},
+            {"category": "Личная информация", "param": "Полное имя", "value": "Тестовый Тест"},
         ],
     }
 
