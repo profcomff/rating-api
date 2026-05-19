@@ -50,7 +50,9 @@ class Lecturer(BaseDbModel):
     avatar_link: Mapped[str] = mapped_column(String, nullable=True, comment="Ссылка на аву препода")
     timetable_id: Mapped[int]
     comments: Mapped[list[Comment]] = relationship("Comment", back_populates="lecturer")
-    lecturer_user_comments: Mapped[list[LecturerUserComment]] = relationship("LecturerUserComment", back_populates="lecturer", cascade="all, delete-orphan")
+    lecturer_user_comments: Mapped[list[LecturerUserComment]] = relationship(
+        "LecturerUserComment", back_populates="lecturer", cascade="all, delete-orphan"
+    )
     mark_weighted: Mapped[float] = mapped_column(
         Float,
         nullable=False,

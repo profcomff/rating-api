@@ -9,11 +9,8 @@ from _pytest.monkeypatch import MonkeyPatch
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-
-from sqlalchemy import event
 from fastapi_sqlalchemy import db
-
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from testcontainers.postgres import PostgresContainer
 
@@ -21,7 +18,6 @@ from rating_api.models.db import *
 from rating_api.routes import app
 from rating_api.settings import Settings, get_settings
 
-from auth_lib.fastapi import UnionAuth
 
 class PostgresConfig:
     """Дата-класс со значениями для контейнера с тестовой БД и alembic-миграции."""
@@ -100,7 +96,7 @@ def dbsession(db_container):
 def logging_sql_req_before_execute(dbsession):
     """
     Фикстура для логирования всех сформированных в рамках одной транзакции
-    SQL-запросов, до их отправки в бд, то есть до Session.flush() или 
+    SQL-запросов, до их отправки в бд, то есть до Session.flush() или
     до Session.commit(), а так же событий сессии BEGIN, COMMIT и ROLLBACK
     """
     engine = dbsession.get_bind()
@@ -108,27 +104,26 @@ def logging_sql_req_before_execute(dbsession):
     @event.listens_for(engine, "before_execute", named=True)
     def sql_requests_listener(**kw_entities_of_executing):
         print("\n========= SQL command =========\n")
-        print(f"SQL was sended: {kw_entities_of_executing.get("clauseelement")}\n")
+        print(f"SQL was sended: {kw_entities_of_executing.get('clauseelement')}\n")
         print("===============================\n")
 
     @event.listens_for(dbsession, "after_begin", named=True)
     def begin_listener(**kw):
         print("\n========= BEGIN =========\n")
         print(f"BEGIN was executed\n")
-        print("===============================\n")  
+        print("===============================\n")
 
     @event.listens_for(dbsession, "after_rollback", named=True)
     def begin_listener(**kw):
         print("\n========= ROLLBACK =========\n")
         print(f"ROLLBACK was executed\n")
-        print("===============================\n")  
+        print("===============================\n")
 
     @event.listens_for(dbsession, "after_commit", named=True)
     def begin_listener(**kw):
         print("\n========= COMMIT =========\n")
         print(f"COMMIT was executed\n")
-        print("===============================\n")  
-    
+        print("===============================\n")
 
 
 @pytest.fixture()
@@ -144,28 +139,32 @@ def authlib_user():
     """
     Данные о пользователе, возвращаемые сервисом auth.
     """
-    return {"auth_methods":["email","github_auth"],
-            "session_scopes":[
-                {"id":145,"name":"auth.session.create"},
-                {"id":146,"name":"auth.session.update"},
-                {"id":165,"name":"auth.user.selfdelete"}
-                ],
-            "user_scopes":[
-                {"id":145,"name":"auth.session.create"},
-                {"id":146,"name":"auth.session.update"},
-                {"id":165,"name":"auth.user.selfdelete"}
-                ],
-            "indirect_groups":[99],
-            "groups":[99],
-            "id":0,
-            "email":"aslimbo2001@gmail.com",
-            "userdata":[
-                {"category":"Личная информация","param":"Полное имя","value":"Namazov Maksim"},
-                {"category":"Личная информация","param":"Фото","value":"https://avatars.githubusercontent.com/u/192724282?v=4"},
-                {"category":"Контакты","param":"Имя пользователя GitHub","value":"CaseAsLimbo"}
-                ]
-           }
-    
+    return {
+        "auth_methods": ["email", "github_auth"],
+        "session_scopes": [
+            {"id": 145, "name": "auth.session.create"},
+            {"id": 146, "name": "auth.session.update"},
+            {"id": 165, "name": "auth.user.selfdelete"},
+        ],
+        "user_scopes": [
+            {"id": 145, "name": "auth.session.create"},
+            {"id": 146, "name": "auth.session.update"},
+            {"id": 165, "name": "auth.user.selfdelete"},
+        ],
+        "indirect_groups": [99],
+        "groups": [99],
+        "id": 0,
+        "email": "aslimbo2001@gmail.com",
+        "userdata": [
+            {"category": "Личная информация", "param": "Полное имя", "value": "Namazov Maksim"},
+            {
+                "category": "Личная информация",
+                "param": "Фото",
+                "value": "https://avatars.githubusercontent.com/u/192724282?v=4",
+            },
+            {"category": "Контакты", "param": "Имя пользователя GitHub", "value": "CaseAsLimbo"},
+        ],
+    }
 
 
 @pytest.fixture()
