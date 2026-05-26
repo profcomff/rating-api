@@ -207,6 +207,94 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
 
 
 @pytest.mark.parametrize(
+    "body, total, response_status",
+    [
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 1,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 2,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            2,
+            status.HTTP_200_OK,
+        ),
+        (
+            {"comments": []},
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 4,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            1,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subdject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": "abc",
+                    },
+                ],
+            },
+            None,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+        ),
+    ],
+)
+def test_import_comments(client, dbsession, lecturers, body, total, response_status):
+    response = client.post(f"{url}/import", json=body)
+
+    assert response.status_code == response_status
+
+    new_comments = response.json()
+    print(new_comments)
+
+    assert total == new_comments.get("total")
+
+    if new_comments.get("total") and total > 0:
+        for comment in new_comments.get("comments"):
+            comment_from_db = Comment.query(session=dbsession).filter(Comment.uuid == comment.get("uuid")).one_or_none()
+            assert comment_from_db is not None
+
+
+@pytest.mark.parametrize(
     "reaction_data, expected_reaction, comment_user_id",
     [
         (None, None, 0),
