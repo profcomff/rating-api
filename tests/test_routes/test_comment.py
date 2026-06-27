@@ -2,7 +2,6 @@ import datetime
 import logging
 
 import pytest
-from auth_lib.fastapi import UnionAuth
 from starlette import status
 
 from rating_api.models import Comment, CommentReaction, LecturerUserComment, Reaction, ReviewStatus
@@ -175,23 +174,24 @@ settings = get_settings()
         ),
     ],
 )
-def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
+def test_create_comment(client, dbsession, lecturers, authlib_user, body, lecturer_n, response_status):
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
 
-    # Проверка корректности переданных в userdata "param"
-    user = UnionAuth.__call__(post_response)
-    acceptable_params = ["Полное имя", "Фото", "Имя пользователя GitHub", "Номер Телефона"]
-    real_params = [i["param"] for i in user.get("userdata")]
-    for param in real_params:
-        assert (
-            param in acceptable_params
-        ), f"Не допустимый параметр: \"{i}\"! Список допустимых параметров: {acceptable_params}"
-
     assert post_response.status_code == response_status
+
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
         assert comment is not None
+
+        # проверка корректной записи user_id и fullname при анонимных и не анонимных комментариях
+        if "is_anonymous" in body:
+            if body.is_anonymous:
+                assert comment.user_id is None
+                assert comment.fullname is None
+            else:
+                assert comment.user_id == authlib_user.get("id")
+                assert comment.fullname == authlib_user.get("userdata")[0]["value"]
 
         if "create_ts" in body:
             assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
@@ -204,6 +204,94 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
             .one_or_none()
         )
         assert user_comment is not None
+
+
+@pytest.mark.parametrize(
+    "body, total, response_status",
+    [
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 1,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 2,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            2,
+            status.HTTP_200_OK,
+        ),
+        (
+            {"comments": []},
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 4,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            1,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subdject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": "abc",
+                    },
+                ],
+            },
+            None,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+        ),
+    ],
+)
+def test_import_comments(client, dbsession, lecturers, body, total, response_status):
+    response = client.post(f"{url}/import", json=body)
+
+    assert response.status_code == response_status
+
+    new_comments = response.json()
+    print(new_comments)
+
+    assert total == new_comments.get("total")
+
+    if new_comments.get("total") and total > 0:
+        for comment in new_comments.get("comments"):
+            comment_from_db = Comment.query(session=dbsession).filter(Comment.uuid == comment.get("uuid")).one_or_none()
+            assert comment_from_db is not None
 
 
 @pytest.mark.parametrize(
