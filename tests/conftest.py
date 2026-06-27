@@ -126,6 +126,7 @@ def client(mocker, user_mock):
     client = TestClient(app)
     return client
 
+
 @pytest.fixture
 def lecturer(dbsession):
     _lecturer = Lecturer(first_name="test_fname", last_name="test_lname", middle_name="test_mname", timetable_id=9900)
