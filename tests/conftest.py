@@ -247,6 +247,7 @@ def lecturers(dbsession):
         )
         for row in lecturer_user_comments:
             dbsession.delete(row)
+            dbsession.flush()
         dbsession.delete(lecturer)
     dbsession.commit()
 
