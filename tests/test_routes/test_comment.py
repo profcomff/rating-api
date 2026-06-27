@@ -274,7 +274,7 @@ def test_create_comment(client, dbsession, lecturers, authlib_user, body, lectur
                 ],
             },
             None,
-            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
         ),
     ],
 )
