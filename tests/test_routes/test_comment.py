@@ -186,12 +186,12 @@ def test_create_comment(client, dbsession, lecturers, authlib_user, body, lectur
 
         # проверка корректной записи user_id и fullname при анонимных и не анонимных комментариях
         if "is_anonymous" in body:
-            if body.is_anonymous:
+            if body.get("is_anonymous"):
                 assert comment.user_id is None
-                assert comment.fullname is None
+                assert comment.user_fullname is None
             else:
                 assert comment.user_id == authlib_user.get("id")
-                assert comment.fullname == authlib_user.get("userdata")[0]["value"]
+                assert comment.user_fullname == authlib_user.get("userdata")[0]["value"]
 
         if "create_ts" in body:
             assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)

@@ -130,27 +130,7 @@ async def create_comment(
         review_status=ReviewStatus.PENDING,
     )
 
-    # Выдача аччивки юзеру за первый комментарий
-    async with aiohttp.ClientSession() as session:
-        give_achievement = True
-        async with session.get(
-            settings.API_URL + f"achievement/user/{user.get('id'):}",
-            headers={"Accept": "application/json"},
-        ) as response:
-            if response.status == 200:
-                user_achievements = await response.json()
-                for achievement in user_achievements.get("achievement", []):
-                    if achievement.get("id") == settings.FIRST_COMMENT_ACHIEVEMENT_ID:
-                        give_achievement = False
-                        break
-            else:
-                give_achievement = False
-        if give_achievement:
-            session.post(
-                settings.API_URL
-                + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{user.get('id'):}",
-                headers={"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN},
-            )
+    
 
     return CommentGet.model_validate(new_comment)
 
