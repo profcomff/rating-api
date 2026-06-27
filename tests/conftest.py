@@ -97,21 +97,12 @@ def authlib_user():
     Данные о пользователе, возвращаемые сервисом auth.
     """
     return {
-        "auth_methods": ["email", "github_auth"],
-        "session_scopes": [
-            {"id": 145, "name": "auth.session.create"},
-            {"id": 146, "name": "auth.session.update"},
-            {"id": 165, "name": "auth.user.selfdelete"},
-        ],
-        "user_scopes": [
-            {"id": 145, "name": "auth.session.create"},
-            {"id": 146, "name": "auth.session.update"},
-            {"id": 165, "name": "auth.user.selfdelete"},
-        ],
-        "indirect_groups": [99],
-        "groups": [99],
+        "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
+        "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
+        "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
+        "groups": [{"id": 0, "name": "string", "parent_id": 0}],
         "id": 0,
-        "email": "aslimbo2001@gmail.com",
+        "email": "string",
         "userdata": [
             {"category": "Личная информация", "param": "Полное имя", "value": "Тестовый Тест"},
         ],
@@ -134,7 +125,6 @@ def user_mock(authlib_mock, authlib_user):
 def client(mocker, user_mock):
     client = TestClient(app)
     return client
-
 
 @pytest.fixture
 def lecturer(dbsession):
@@ -244,7 +234,8 @@ def lecturers(dbsession):
         Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
     )
     lecturers[-1].is_deleted = True
-    dbsession.add_all(lecturers)
+    for lecturer in lecturers:
+        dbsession.add(lecturer)
     dbsession.commit()
     yield lecturers
     for lecturer in lecturers:
