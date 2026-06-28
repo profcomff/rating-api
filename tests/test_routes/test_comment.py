@@ -15,9 +15,9 @@ settings = get_settings()
 
 
 @pytest.mark.parametrize(
-    'body,lecturer_n,response_status',
+    'body,lecturer_n,response_status,aiohttp_response_status,achievement_id',
     [
-        (
+        (  # тест логики выдачи ачивки за первый комментарий
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -27,6 +27,34 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            0,
+        ),
+        (  # тест логики блокирующей выдачу ачивки за первый комментарий, если она уже есть у юзера
+            {
+                "subject": "test_subject",
+                "text": "test text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+        ),
+        (  # тест логики выдачи ачивки в случае неудачного get-запроса к серверу
+            {
+                "subject": "test_subject",
+                "text": "test text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            0,
         ),
         (
             {
@@ -38,6 +66,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (
             {
@@ -49,6 +79,8 @@ settings = get_settings()
             },
             1,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # bad mark
             {
@@ -60,6 +92,8 @@ settings = get_settings()
             },
             2,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # deleted lecturer
             {
@@ -71,6 +105,8 @@ settings = get_settings()
             },
             3,
             status.HTTP_404_NOT_FOUND,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Anonymous comment
             {
@@ -83,6 +119,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # NotAnonymous comment
             {
@@ -95,6 +133,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Not provided anonymity
             {
@@ -106,6 +146,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Bad anonymity
             {
@@ -118,6 +160,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # regex test
             {
@@ -133,6 +177,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # forbidden symbols
             {
@@ -147,6 +193,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # long comment
             {
@@ -159,6 +207,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # long comment but not that long
             {
@@ -171,10 +221,42 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
     ],
 )
-def test_create_comment(client, dbsession, lecturers, authlib_user, body, lecturer_n, response_status):
+def test_create_comment(
+    client,
+    dbsession,
+    lecturers,
+    authlib_user,
+    aiohttp_mp,
+    body,
+    lecturer_n,
+    response_status,
+    aiohttp_response_status,
+    achievement_id,
+):
+    check_get_response = aiohttp_mp.get(
+        settings.API_URL + f"achievement/user/{authlib_user.get('id'):}",
+        status=aiohttp_response_status,
+        payload={
+            "user_id": 0,
+            "achievement": [
+                {
+                    "id": settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+                }
+            ],
+        },
+    )
+
+    check_post_response = aiohttp_mp.post(
+        settings.API_URL
+        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}",
+        status=200,
+    )
+
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
 
@@ -204,6 +286,25 @@ def test_create_comment(client, dbsession, lecturers, authlib_user, body, lectur
             .one_or_none()
         )
         assert user_comment is not None
+
+        # Проверка логики выдачи ачивок
+        if check_get_response.called:
+            if aiohttp_response_status == status.HTTP_200_OK:
+                # Проверяем правильность заголовков get-запроса
+                headers = check_get_response.requests[0].kwargs["headers"]
+                assert headers["Accept"] == "application/json"
+
+                if achievement_id != settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                    assert check_post_response.called
+                    # проверяем правильность заголовков post-запроса
+                    headers = check_post_response.requests[0].kwargs["headers"]
+                    assert headers["Accept"] == "application/json"
+                    assert headers["Authorization"] == settings.ACHIEVEMENT_GIVE_TOKEN
+
+                else:
+                    assert not check_post_response.called
+            else:
+                assert not check_post_response.called
 
 
 @pytest.mark.parametrize(
