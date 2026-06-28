@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
+from aioresponses import aioresponses
 from alembic import command
 from alembic.config import Config as AlembicConfig
 from fastapi.testclient import TestClient
@@ -41,6 +42,13 @@ def session_mp():
     mp = MonkeyPatch()
     yield mp
     mp.undo()
+
+
+@pytest.fixture(autouse=True)
+def aiohttp_mp():
+    """Фикстура для перехвата любых aiohttp запросов aiohttp.ClientSession()"""
+    with aioresponses() as aiohttp_mock:
+        yield aiohttp_mock
 
 
 @pytest.fixture(scope='session')
