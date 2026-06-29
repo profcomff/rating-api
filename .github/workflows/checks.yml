@@ -25,12 +25,16 @@ jobs:
           python -m ensurepip
           python -m pip install --upgrade --no-cache-dir pip
           python -m pip install --upgrade --no-cache-dir -r requirements.txt -r requirements.dev.txt
+      - name: Show installed packages
+        run: pip freeze
       - name: Migrate DB
         run: |
           DB_DSN=postgresql://postgres@localhost:5432/postgres alembic upgrade head
       - name: Build coverage file
+        id: pytest
+        continue-on-error: true
         run: |
-          DB_DSN=postgresql://postgres@localhost:5432/postgres pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=rating_api tests/ | tee pytest-coverage.txt
+          DB_DSN=postgresql://postgres@localhost:5432/postgres pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=rating_api tests/ -vv --tb=long | tee pytest-coverage.txt
       - name: Print report
         if: always()
         run: |
@@ -69,4 +73,3 @@ jobs:
         with:
           message: |
             :poop: Code linting failed, use `black` and `isort` to fix it.
-
