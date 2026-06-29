@@ -69,4 +69,3 @@ jobs:
         with:
           message: |
             :poop: Code linting failed, use `black` and `isort` to fix it.
-            
