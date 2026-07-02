@@ -44,7 +44,7 @@ def session_mp():
     mp.undo()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def aiohttp_mp():
     """Фикстура для перехвата любых aiohttp запросов aiohttp.ClientSession()"""
     with aioresponses() as aiohttp_mock:
