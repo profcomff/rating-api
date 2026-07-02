@@ -61,6 +61,7 @@ settings = get_settings()
                 "subject": "test_subject",
                 "text": "test text",
                 "mark_kindness": 1,
+                    
                 "mark_freebie": 0,
                 "mark_clarity": 0,
             },
@@ -238,23 +239,24 @@ def test_create_comment(
     aiohttp_response_status,
     achievement_id,
 ):
-    check_get_response = aiohttp_mp.get(
-        settings.API_URL + f"achievement/user/{authlib_user.get('id'):}",
+    achive_get_url = settings.API_URL + f"achievement/user/{authlib_user.get('id'):}"
+    achive_post_url = settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
+
+    aiohttp_mp.get(
+        achive_get_url,
         status=aiohttp_response_status,
         payload={
-            "user_id": 0,
+            "user_id": authlib_user.get("id"),
             "achievement": [
                 {
-                    "id": settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+                    "id": achievement_id,
                 }
             ],
         },
     )
-
-    check_post_response = aiohttp_mp.post(
-        settings.API_URL
-        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}",
-        status=200,
+    aiohttp_mp.post(
+        achive_post_url,
+        status=status.HTTP_200_OK,
     )
 
     params = {"lecturer_id": lecturers[lecturer_n].id}
@@ -265,15 +267,15 @@ def test_create_comment(
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
         assert comment is not None
+        assert comment.review_status is ReviewStatus.PENDING
 
         # проверка корректной записи user_id и fullname при анонимных и не анонимных комментариях
-        if "is_anonymous" in body:
-            if body.get("is_anonymous"):
-                assert comment.user_id is None
-                assert comment.user_fullname is None
-            else:
-                assert comment.user_id == authlib_user.get("id")
-                assert comment.user_fullname == authlib_user.get("userdata")[0]["value"]
+        if body.get("is_anonymous") is not False:
+            assert comment.user_id is None
+            assert comment.user_fullname is None
+        else:
+            assert comment.user_id == authlib_user.get("id")
+            assert comment.user_fullname == authlib_user.get("userdata")[0]["value"]
 
         if "create_ts" in body:
             assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
@@ -286,25 +288,35 @@ def test_create_comment(
             .one_or_none()
         )
         assert user_comment is not None
-
+        
         # Проверка логики выдачи ачивок
-        if check_get_response.called:
-            if aiohttp_response_status == status.HTTP_200_OK:
-                # Проверяем правильность заголовков get-запроса
-                headers = check_get_response.requests[0].kwargs["headers"]
-                assert headers["Accept"] == "application/json"
+        check_post_response = False
+        get_headers = {}
+        post_headers = {}
 
-                if achievement_id != settings.FIRST_COMMENT_ACHIEVEMENT_ID:
-                    assert check_post_response.called
-                    # проверяем правильность заголовков post-запроса
-                    headers = check_post_response.requests[0].kwargs["headers"]
-                    assert headers["Accept"] == "application/json"
-                    assert headers["Authorization"] == settings.ACHIEVEMENT_GIVE_TOKEN
+        for k, v in aiohttp_mp.requests.items():
+            if k[0] == "GET" and str(k[1]) == achive_get_url:
+                get_headers = v[0].kwargs.get("headers", {})
 
-                else:
-                    assert not check_post_response.called
+            if k[0] == "POST" and str(k[1]) == achive_post_url:
+                check_post_response = True
+                post_headers = v[0].kwargs.get("headers", {})
+
+
+        if aiohttp_response_status == status.HTTP_200_OK:
+            # Проверяем правильность заголовков get-запроса
+            assert get_headers.get("Accept") == "application/json"
+
+            if achievement_id != settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                assert check_post_response
+                # проверяем правильность заголовков post-запроса
+                assert post_headers.get("Accept") == "application/json"
+                assert post_headers.get("Authorization") == settings.ACHIEVEMENT_GIVE_TOKEN
+
             else:
-                assert not check_post_response.called
+                assert not check_post_response
+        else:
+            assert not check_post_response
 
 
 @pytest.mark.parametrize(
