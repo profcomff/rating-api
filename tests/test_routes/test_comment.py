@@ -231,7 +231,7 @@ def test_create_comment(
     dbsession,
     lecturers,
     authlib_user,
-    aiohttp_mp,
+    mocker,
     body,
     lecturer_n,
     response_status,
@@ -244,8 +244,21 @@ def test_create_comment(
         + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
     )
 
-    aiohttp_mp.get(
-        achive_get_url,
+    # функция для создания мока ответа на асинхронный запрос
+    def create_response_mock(status=status.HTTP_200_OK, payload=None):
+        mock_post_response = mocker.AsyncMock()
+        mock_post_response.status = status
+        mock_post_response.json = mocker.AsyncMock(return_value=payload or {})
+        return mock_post_response
+
+    # функция для создания мока асинхронного контекстного менеджера(для подмены async with session.get(...) as response: ...)
+    def create_ae_context_manager(mock_response):
+        ctx = mocker.AsyncMock()
+        ctx.__aenter__.return_value = mock_response
+        return ctx
+
+    # coздаем моки ответов aiohttp get- и post- запросов
+    mock_get_response = create_response_mock(
         status=aiohttp_response_status,
         payload={
             "user_id": authlib_user.get("id"),
@@ -256,10 +269,26 @@ def test_create_comment(
             ],
         },
     )
-    aiohttp_mp.post(
-        achive_post_url,
-        status=status.HTTP_200_OK,
-    )
+    mock_post_response = create_response_mock(payload={})
+
+    # словари ожидаемых ответов c запросов на конкретный url для side_effect
+    get_responses = {achive_get_url: create_ae_context_manager(mock_get_response)}
+    post_responses = {achive_post_url: mock_post_response}
+
+    # функции для side_effect моков get- и post- aiohttp запросов, если запрос был к не тому url, мок всегда вернет 404(не используется для проверки)
+    def get_side_effect(url, *args, **kwargs):
+        return get_responses.get(url, create_ae_context_manager(create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    def post_side_effect(url, *args, **kwargs):
+        return post_responses.get(url, (create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    # создаем мок сессии aiohttp.ClientSession
+    mock_aiohttp_session = mocker.AsyncMock()
+    # для мока session.get(...) используем MagicMock вместо AsyncMock, потому что это синхронный метод
+    mock_aiohttp_session.get = mocker.MagicMock(side_effect=get_side_effect)
+    mock_aiohttp_session.post.side_effect = post_side_effect
+    mock_aiohttp_session.__aenter__.return_value = mock_aiohttp_session
+    mocker.patch("aiohttp.ClientSession", return_value=mock_aiohttp_session)
 
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
@@ -291,33 +320,36 @@ def test_create_comment(
         )
         assert user_comment is not None
 
-        # Проверка логики выдачи ачивок
-        check_post_response = False
-        get_headers = {}
-        post_headers = {}
-
-        for k, v in aiohttp_mp.requests.items():
-            if k[0] == "GET" and str(k[1]) == achive_get_url:
-                get_headers = v[0].kwargs.get("headers", {})
-
-            if k[0] == "POST" and str(k[1]) == achive_post_url:
-                check_post_response = True
-                post_headers = v[0].kwargs.get("headers", {})
+        # Проверка логики ачивки
+        check_get_response = mock_aiohttp_session.get
+        check_post_response = mock_aiohttp_session.post
 
         if aiohttp_response_status == status.HTTP_200_OK:
-            # Проверяем правильность заголовков get-запроса
-            assert get_headers.get("Accept") == "application/json"
+            # Проверяем правильность заголовков и url get-запроса
+            get_headers = {"Accept": "application/json"}
+            try:
+                check_get_response.assert_any_call(achive_get_url, headers=get_headers)
+            except AssertionError as e:
+                raise AssertionError(
+                    f"Ожидался GET-запрос на {achive_get_url} c загловками {get_headers},"
+                    f"но вызов, либо не состоялся, либо были переданы неверные заголовки."
+                ) from e
 
             if achievement_id != settings.FIRST_COMMENT_ACHIEVEMENT_ID:
-                assert check_post_response
-                # проверяем правильность заголовков post-запроса
-                assert post_headers.get("Accept") == "application/json"
-                assert post_headers.get("Authorization") == settings.ACHIEVEMENT_GIVE_TOKEN
+                # проверяем правильность заголовков и url post-запроса
+                post_headers = {"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN}
+                try:
+                    check_post_response.assert_any_await(achive_post_url, headers=post_headers)
+                except AssertionError as e:
+                    raise AssertionError(
+                        f"Ожидался POST-запрос на {achive_post_url} c загловками {post_headers},"
+                        f"но вызов, либо не состоялся, либо были переданы неверные заголовки."
+                    )
 
             else:
-                assert not check_post_response
+                check_post_response.assert_not_awaited()
         else:
-            assert not check_post_response
+            check_post_response.assert_not_awaited()
 
 
 @pytest.mark.parametrize(
