@@ -61,7 +61,6 @@ settings = get_settings()
                 "subject": "test_subject",
                 "text": "test text",
                 "mark_kindness": 1,
-                    
                 "mark_freebie": 0,
                 "mark_clarity": 0,
             },
@@ -240,7 +239,10 @@ def test_create_comment(
     achievement_id,
 ):
     achive_get_url = settings.API_URL + f"achievement/user/{authlib_user.get('id'):}"
-    achive_post_url = settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
+    achive_post_url = (
+        settings.API_URL
+        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
+    )
 
     aiohttp_mp.get(
         achive_get_url,
@@ -288,7 +290,7 @@ def test_create_comment(
             .one_or_none()
         )
         assert user_comment is not None
-        
+
         # Проверка логики выдачи ачивок
         check_post_response = False
         get_headers = {}
@@ -301,7 +303,6 @@ def test_create_comment(
             if k[0] == "POST" and str(k[1]) == achive_post_url:
                 check_post_response = True
                 post_headers = v[0].kwargs.get("headers", {})
-
 
         if aiohttp_response_status == status.HTTP_200_OK:
             # Проверяем правильность заголовков get-запроса
@@ -423,7 +424,13 @@ def test_import_comments(client, dbsession, lecturers, body, total, response_sta
     ],
 )
 def test_get_comment_with_reaction(
-    client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction, response_status,
+    client,
+    comment,
+    reaction_data,
+    expected_reaction,
+    comment_user_id,
+    comment_reaction,
+    response_status,
 ):
     comment.user_id = comment_user_id
 
@@ -432,8 +439,8 @@ def test_get_comment_with_reaction(
         comment_reaction(user_id, reaction_type)
 
     response_comment = client.get(f'{url}/{comment.uuid}')
-    
-    assert  response_comment.status_code == response_status
+
+    assert response_comment.status_code == response_status
 
     data = response_comment.json()
     if expected_reaction:
