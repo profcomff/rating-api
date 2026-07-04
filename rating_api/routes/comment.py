@@ -78,8 +78,8 @@ async def create_comment(
 
     # Дата, до которой учитываем комментарии для проверки лимита на комментарии конкретному лектору.
     cutoff_date_lecturer = datetime.datetime(
-        now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) // 12,
-        (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH) % 12,
+        now.year + (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH - 1) // 12,
+        (now.month - settings.COMMENT_LECTURER_FREQUENCE_IN_MONTH - 1) % 12 + 1,
         1,
     )
     lecturer_user_comments_count = (
