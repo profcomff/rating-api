@@ -119,7 +119,7 @@ def authlib_user():
 
 @pytest.fixture()
 def authlib_mock(mocker):
-    auth_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__")
+    auth_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__", autospec=True)
     return auth_mock
 
 
