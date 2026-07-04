@@ -408,22 +408,22 @@ def test_import_comments(client, dbsession, lecturers, body, total, response_sta
 
 
 @pytest.mark.parametrize(
-    "reaction_data, expected_reaction, comment_user_id",
+    "reaction_data, expected_reaction, comment_user_id, response_status",
     [
-        (None, None, 0),
-        ((0, Reaction.LIKE), "is_liked", 0),  # my like on my comment
-        ((0, Reaction.DISLIKE), "is_disliked", 0),
-        ((999, Reaction.LIKE), None, 0),  # someone else's like on my comment
-        ((999, Reaction.DISLIKE), None, 0),
-        ((0, Reaction.LIKE), "is_liked", 999),  # my like on someone else's comment
-        ((0, Reaction.DISLIKE), "is_disliked", 999),
-        ((333, Reaction.LIKE), None, 999),  # someone else's like on another person's comment
-        ((333, Reaction.DISLIKE), None, 999),
-        (None, None, None),  # anonymous
+        (None, None, 0, status.HTTP_200_OK),
+        ((0, Reaction.LIKE), "is_liked", 0, status.HTTP_200_OK),  # my like on my comment
+        ((0, Reaction.DISLIKE), "is_disliked", 0, status.HTTP_200_OK),
+        ((999, Reaction.LIKE), None, 0, status.HTTP_200_OK),  # someone else's like on my comment
+        ((999, Reaction.DISLIKE), None, 0, status.HTTP_200_OK),
+        ((0, Reaction.LIKE), "is_liked", 999, status.HTTP_200_OK),  # my like on someone else's comment
+        ((0, Reaction.DISLIKE), "is_disliked", 999, status.HTTP_200_OK),
+        ((333, Reaction.LIKE), None, 999, status.HTTP_200_OK),  # someone else's like on another person's comment
+        ((333, Reaction.DISLIKE), None, 999, status.HTTP_200_OK),
+        (None, None, None, status.HTTP_200_OK),  # anonymous
     ],
 )
 def test_get_comment_with_reaction(
-    client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction
+    client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction, response_status,
 ):
     comment.user_id = comment_user_id
 
@@ -432,16 +432,15 @@ def test_get_comment_with_reaction(
         comment_reaction(user_id, reaction_type)
 
     response_comment = client.get(f'{url}/{comment.uuid}')
+    
+    assert  response_comment.status_code == response_status
 
-    if response_comment:
-        data = response_comment.json()
-        if expected_reaction:
-            assert data[expected_reaction]
-        else:
-            assert data["is_liked"] == False
-            assert data["is_disliked"] == False
+    data = response_comment.json()
+    if expected_reaction:
+        assert data[expected_reaction]
     else:
-        assert response_comment.status_code == status.HTTP_404_NOT_FOUND
+        assert data["is_liked"] == False
+        assert data["is_disliked"] == False
 
 
 @pytest.fixture
