@@ -377,8 +377,8 @@ def test_delete_lecturer(client, dbsession, lecturers_with_comments):
 def test_lecturer_rating_update(client, dbsession, body, response_status):
     response = client.patch('/lecturer/import_rating', json=[body])
 
-    if response_status == status.HTTP_200_OK:
-        response_dict = response.json()
-        assert isinstance(response_dict, dict)
+    assert response.status_code == response_status
+    response_dict = response.json()
+    assert isinstance(response_dict, dict)
 
-        assert response_dict["failed"] == 0
+    assert response_dict["failed"] == 0
