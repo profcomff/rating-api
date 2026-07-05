@@ -92,16 +92,37 @@ def dbsession(db_container):
 
 
 @pytest.fixture
-def client(mocker):
-    user_mock = mocker.patch('auth_lib.fastapi.UnionAuth.__call__')
-    user_mock.return_value = {
+def authlib_user():
+    """
+    Данные о пользователе, возвращаемые сервисом auth.
+    """
+    return {
         "session_scopes": [{"id": 0, "name": "string", "comment": "string"}],
         "user_scopes": [{"id": 0, "name": "string", "comment": "string"}],
         "indirect_groups": [{"id": 0, "name": "string", "parent_id": 0}],
         "groups": [{"id": 0, "name": "string", "parent_id": 0}],
         "id": 0,
         "email": "string",
+        "userdata": [
+            {"category": "Личная информация", "param": "Полное имя", "value": "Тестовый Тест"},
+        ],
     }
+
+
+@pytest.fixture()
+def authlib_mock(mocker):
+    auth_mock = mocker.patch("auth_lib.fastapi.UnionAuth.__call__", autospec=True)
+    return auth_mock
+
+
+@pytest.fixture()
+def user_mock(authlib_mock, authlib_user):
+    authlib_mock.return_value = authlib_user
+    return authlib_mock
+
+
+@pytest.fixture
+def client(mocker, user_mock):
     client = TestClient(app)
     return client
 
@@ -218,7 +239,6 @@ def lecturers(dbsession):
         dbsession.add(lecturer)
     dbsession.commit()
     yield lecturers
-
     for lecturer in lecturers:
         for row in lecturer.comments:
             dbsession.delete(row)
@@ -227,6 +247,7 @@ def lecturers(dbsession):
         )
         for row in lecturer_user_comments:
             dbsession.delete(row)
+            dbsession.flush()
         dbsession.delete(lecturer)
     dbsession.commit()
 

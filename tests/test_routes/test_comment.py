@@ -1,5 +1,6 @@
 import datetime
 import logging
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette import status
@@ -14,10 +15,69 @@ url: str = '/comment'
 settings = get_settings()
 
 
+def create_response_mock(status=status.HTTP_200_OK, payload=None):
+    """Вспомогательная функция, создающая мок-объекты-ответы типа aiohttp.ClientResponse."""
+    mock_post_response = AsyncMock()
+    mock_post_response.status = status
+    mock_post_response.json = AsyncMock(return_value=payload or {})
+    return mock_post_response
+
+
+def create_ae_context_manager(mock_response):
+    """
+    Вспомогательная функция, создающая мок-объекты имитируютщие асинхронный контекстный
+    менеджер возвращающий мок-объекты-ответы типа aiohttp.ClientResponse
+    (для подмены async with session.get(...) as response: ...).
+    """
+    ctx = AsyncMock()
+    ctx.__aenter__.return_value = mock_response
+    return ctx
+
+
+def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_url, post_url):
+    """Функция создающая мок-объект сессию типа aiohttp.ClientSession. Реализует моки get- и post- методов данного объекта."""
+
+    # url для проверки логики выдачи ачивок
+    achive_get_url = get_url
+    achive_post_url = post_url
+
+    # coздаем моки ответов aiohttp get- и post- запросов
+    mock_get_response = create_response_mock(
+        status=aiohttp_response_status,
+        payload={
+            "user_id": authlib_user_id,
+            "achievement": [
+                {
+                    "id": achievement_id,
+                }
+            ],
+        },
+    )
+    mock_post_response = create_response_mock(payload={})
+    get_responses = {achive_get_url: create_ae_context_manager(mock_get_response)}
+    post_responses = {achive_post_url: mock_post_response}
+
+    # функции для side_effect моков get- и post- aiohttp запросов, если запрос был к не тому url, мок всегда вернет 404(не используется для проверки)
+    def get_side_effect(url, *args, **kwargs):
+        return get_responses.get(url, create_ae_context_manager(create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    def post_side_effect(url, *args, **kwargs):
+        return post_responses.get(url, (create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    # создаем мок сессии aiohttp.ClientSession
+    mock_aiohttp_session = AsyncMock()
+    # для мока session.get(...) используем MagicMock вместо AsyncMock, потому что это синхронный метод
+    mock_aiohttp_session.get = MagicMock(side_effect=get_side_effect)
+    mock_aiohttp_session.post.side_effect = post_side_effect
+    mock_aiohttp_session.__aenter__.return_value = mock_aiohttp_session
+
+    return mock_aiohttp_session
+
+
 @pytest.mark.parametrize(
-    'body,lecturer_n,response_status',
+    'body,lecturer_n,response_status,aiohttp_response_status,achievement_id',
     [
-        (
+        (  # тест логики выдачи ачивки за первый комментарий
             {
                 "subject": "test_subject",
                 "text": "test text",
@@ -27,6 +87,34 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            0,
+        ),
+        (  # тест логики блокирующей выдачу ачивки за первый комментарий, если она уже есть у юзера
+            {
+                "subject": "test_subject",
+                "text": "test text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+        ),
+        (  # тест логики выдачи ачивки в случае неудачного get-запроса к серверу
+            {
+                "subject": "test_subject",
+                "text": "test text",
+                "mark_kindness": 1,
+                "mark_freebie": 0,
+                "mark_clarity": 0,
+            },
+            0,
+            status.HTTP_200_OK,
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            0,
         ),
         (
             {
@@ -38,6 +126,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (
             {
@@ -49,6 +139,8 @@ settings = get_settings()
             },
             1,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # bad mark
             {
@@ -60,6 +152,8 @@ settings = get_settings()
             },
             2,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # deleted lecturer
             {
@@ -71,6 +165,8 @@ settings = get_settings()
             },
             3,
             status.HTTP_404_NOT_FOUND,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Anonymous comment
             {
@@ -83,6 +179,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # NotAnonymous comment
             {
@@ -95,6 +193,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Not provided anonymity
             {
@@ -106,6 +206,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # Bad anonymity
             {
@@ -118,6 +220,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # regex test
             {
@@ -133,6 +237,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # forbidden symbols
             {
@@ -147,6 +253,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # long comment
             {
@@ -159,6 +267,8 @@ settings = get_settings()
             },
             0,
             status.HTTP_400_BAD_REQUEST,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
         (  # long comment but not that long
             {
@@ -171,16 +281,58 @@ settings = get_settings()
             },
             0,
             status.HTTP_200_OK,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
         ),
     ],
 )
-def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response_status):
+def test_create_comment(
+    client,
+    dbsession,
+    lecturers,
+    authlib_user,
+    mocker,
+    body,
+    lecturer_n,
+    response_status,
+    aiohttp_response_status,
+    achievement_id,
+):
+    # url для проверки логики выдачи ачивок
+    achive_get_url = settings.API_URL + f"achievement/user/{authlib_user.get('id'):}"
+    achive_post_url = (
+        settings.API_URL
+        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
+    )
+
+    # мок aiohttp get- и post- запросов связанных с выдачей ачивки
+    mock_aiohttp_session = aiohttp_mock(
+        authlib_user_id=authlib_user.get("id"),
+        aiohttp_response_status=aiohttp_response_status,
+        achievement_id=achievement_id,
+        get_url=achive_get_url,
+        post_url=achive_post_url,
+    )
+
+    mocker.patch("aiohttp.ClientSession", return_value=mock_aiohttp_session)
+
     params = {"lecturer_id": lecturers[lecturer_n].id}
     post_response = client.post(url, json=body, params=params)
+
     assert post_response.status_code == response_status
+
     if response_status == status.HTTP_200_OK:
         comment = Comment.query(session=dbsession).filter(Comment.uuid == post_response.json()["uuid"]).one_or_none()
         assert comment is not None
+        assert comment.review_status is ReviewStatus.PENDING
+
+        # проверка корректной записи user_id и fullname при анонимных и не анонимных комментариях
+        if body.get("is_anonymous") is not False:
+            assert comment.user_id is None
+            assert comment.user_fullname is None
+        else:
+            assert comment.user_id == authlib_user.get("id")
+            assert comment.user_fullname == authlib_user.get("userdata")[0]["value"]
 
         if "create_ts" in body:
             assert comment.create_ts == datetime.datetime.fromisoformat(body["create_ts"]).replace(tzinfo=None)
@@ -194,24 +346,149 @@ def test_create_comment(client, dbsession, lecturers, body, lecturer_n, response
         )
         assert user_comment is not None
 
+        # Проверка логики ачивки
+        check_get_response = mock_aiohttp_session.get
+        check_post_response = mock_aiohttp_session.post
+
+        if aiohttp_response_status == status.HTTP_200_OK:
+            # Проверяем правильность заголовков и url get-запроса
+            get_headers = {"Accept": "application/json"}
+            try:
+                check_get_response.assert_any_call(achive_get_url, headers=get_headers)
+            except AssertionError as e:
+                raise AssertionError(
+                    f"Ожидался GET-запрос на {achive_get_url} c загловками {get_headers},"
+                    f"но вызов, либо не состоялся, либо были переданы неверные заголовки."
+                ) from e
+
+            if achievement_id != settings.FIRST_COMMENT_ACHIEVEMENT_ID:
+                # проверяем правильность заголовков и url post-запроса
+                post_headers = {"Accept": "application/json", "Authorization": settings.ACHIEVEMENT_GIVE_TOKEN}
+                try:
+                    check_post_response.assert_any_await(achive_post_url, headers=post_headers)
+                except AssertionError as e:
+                    raise AssertionError(
+                        f"Ожидался POST-запрос на {achive_post_url} c загловками {post_headers},"
+                        f"но вызов, либо не состоялся, либо были переданы неверные заголовки."
+                    )
+
+            else:
+                check_post_response.assert_not_awaited()
+        else:
+            check_post_response.assert_not_awaited()
+
 
 @pytest.mark.parametrize(
-    "reaction_data, expected_reaction, comment_user_id",
+    "body, total, response_status",
     [
-        (None, None, 0),
-        ((0, Reaction.LIKE), "is_liked", 0),  # my like on my comment
-        ((0, Reaction.DISLIKE), "is_disliked", 0),
-        ((999, Reaction.LIKE), None, 0),  # someone else's like on my comment
-        ((999, Reaction.DISLIKE), None, 0),
-        ((0, Reaction.LIKE), "is_liked", 999),  # my like on someone else's comment
-        ((0, Reaction.DISLIKE), "is_disliked", 999),
-        ((333, Reaction.LIKE), None, 999),  # someone else's like on another person's comment
-        ((333, Reaction.DISLIKE), None, 999),
-        (None, None, None),  # anonymous
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 1,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 2,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            2,
+            status.HTTP_200_OK,
+        ),
+        (
+            {"comments": []},
+            0,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": 4,
+                        "create_ts": "2026-05-25T11:41:26.777Z",
+                        "update_ts": "2026-05-25T11:41:26.777Z",
+                    },
+                ],
+            },
+            1,
+            status.HTTP_200_OK,
+        ),
+        (
+            {
+                "comments": [
+                    {
+                        "subdject": "string",
+                        "text": "string",
+                        "mark_kindness": 0,
+                        "mark_freebie": 0,
+                        "mark_clarity": 0,
+                        "lecturer_id": "abc",
+                    },
+                ],
+            },
+            None,
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        ),
+    ],
+)
+def test_import_comments(client, dbsession, lecturers, body, total, response_status):
+    response = client.post(f"{url}/import", json=body)
+
+    assert response.status_code == response_status
+
+    new_comments = response.json()
+    print(new_comments)
+
+    assert total == new_comments.get("total")
+
+    if new_comments.get("total") and total > 0:
+        for comment in new_comments.get("comments"):
+            comment_from_db = Comment.query(session=dbsession).filter(Comment.uuid == comment.get("uuid")).one_or_none()
+            assert comment_from_db is not None
+
+
+@pytest.mark.parametrize(
+    "reaction_data, expected_reaction, comment_user_id, response_status",
+    [
+        (None, None, 0, status.HTTP_200_OK),
+        ((0, Reaction.LIKE), "is_liked", 0, status.HTTP_200_OK),  # my like on my comment
+        ((0, Reaction.DISLIKE), "is_disliked", 0, status.HTTP_200_OK),
+        ((999, Reaction.LIKE), None, 0, status.HTTP_200_OK),  # someone else's like on my comment
+        ((999, Reaction.DISLIKE), None, 0, status.HTTP_200_OK),
+        ((0, Reaction.LIKE), "is_liked", 999, status.HTTP_200_OK),  # my like on someone else's comment
+        ((0, Reaction.DISLIKE), "is_disliked", 999, status.HTTP_200_OK),
+        ((333, Reaction.LIKE), None, 999, status.HTTP_200_OK),  # someone else's like on another person's comment
+        ((333, Reaction.DISLIKE), None, 999, status.HTTP_200_OK),
+        (None, None, None, status.HTTP_200_OK),  # anonymous
     ],
 )
 def test_get_comment_with_reaction(
-    client, comment, reaction_data, expected_reaction, comment_user_id, comment_reaction
+    client,
+    comment,
+    reaction_data,
+    expected_reaction,
+    comment_user_id,
+    comment_reaction,
+    response_status,
 ):
     comment.user_id = comment_user_id
 
@@ -221,15 +498,14 @@ def test_get_comment_with_reaction(
 
     response_comment = client.get(f'{url}/{comment.uuid}')
 
-    if response_comment:
-        data = response_comment.json()
-        if expected_reaction:
-            assert data[expected_reaction]
-        else:
-            assert data["is_liked"] == False
-            assert data["is_disliked"] == False
+    assert response_comment.status_code == response_status
+
+    data = response_comment.json()
+    if expected_reaction:
+        assert data[expected_reaction]
     else:
-        assert response_comment.status_code == status.HTTP_404_NOT_FOUND
+        assert data["is_liked"] == False
+        assert data["is_disliked"] == False
 
 
 @pytest.fixture
