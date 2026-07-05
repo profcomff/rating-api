@@ -1,5 +1,6 @@
 import datetime
 import logging
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from starlette import status
@@ -12,6 +13,65 @@ logger = logging.getLogger(__name__)
 url: str = '/comment'
 
 settings = get_settings()
+
+
+def create_response_mock(status=status.HTTP_200_OK, payload=None):
+    """Вспомогательная функция, создающая мок-объекты-ответы типа aiohttp.ClientResponse."""
+    mock_post_response = AsyncMock()
+    mock_post_response.status = status
+    mock_post_response.json = AsyncMock(return_value=payload or {})
+    return mock_post_response
+
+
+def create_ae_context_manager(mock_response):
+    """
+    Вспомогательная функция, создающая мок-объекты имитируютщие асинхронный контекстный
+    менеджер возвращающий мок-объекты-ответы типа aiohttp.ClientResponse
+    (для подмены async with session.get(...) as response: ...).
+    """
+    ctx = AsyncMock()
+    ctx.__aenter__.return_value = mock_response
+    return ctx
+
+
+def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_url, post_url):
+    """Функция создающая мок-объект сессию типа aiohttp.ClientSession. Реализует моки get- и post- методов данного объекта."""
+
+    # url для проверки логики выдачи ачивок
+    achive_get_url = get_url
+    achive_post_url = post_url
+
+    # coздаем моки ответов aiohttp get- и post- запросов
+    mock_get_response = create_response_mock(
+        status=aiohttp_response_status,
+        payload={
+            "user_id": authlib_user_id,
+            "achievement": [
+                {
+                    "id": achievement_id,
+                }
+            ],
+        },
+    )
+    mock_post_response = create_response_mock(payload={})
+    get_responses = {achive_get_url: create_ae_context_manager(mock_get_response)}
+    post_responses = {achive_post_url: mock_post_response}
+
+    # функции для side_effect моков get- и post- aiohttp запросов, если запрос был к не тому url, мок всегда вернет 404(не используется для проверки)
+    def get_side_effect(url, *args, **kwargs):
+        return get_responses.get(url, create_ae_context_manager(create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    def post_side_effect(url, *args, **kwargs):
+        return post_responses.get(url, (create_response_mock(status=status.HTTP_404_NOT_FOUND)))
+
+    # создаем мок сессии aiohttp.ClientSession
+    mock_aiohttp_session = AsyncMock()
+    # для мока session.get(...) используем MagicMock вместо AsyncMock, потому что это синхронный метод
+    mock_aiohttp_session.get = MagicMock(side_effect=get_side_effect)
+    mock_aiohttp_session.post.side_effect = post_side_effect
+    mock_aiohttp_session.__aenter__.return_value = mock_aiohttp_session
+
+    return mock_aiohttp_session
 
 
 @pytest.mark.parametrize(
@@ -238,56 +298,22 @@ def test_create_comment(
     aiohttp_response_status,
     achievement_id,
 ):
+    # url для проверки логики выдачи ачивок
     achive_get_url = settings.API_URL + f"achievement/user/{authlib_user.get('id'):}"
     achive_post_url = (
         settings.API_URL
         + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{authlib_user.get('id'):}"
     )
 
-    # функция для создания мока ответа на асинхронный запрос
-    def create_response_mock(status=status.HTTP_200_OK, payload=None):
-        mock_post_response = mocker.AsyncMock()
-        mock_post_response.status = status
-        mock_post_response.json = mocker.AsyncMock(return_value=payload or {})
-        return mock_post_response
-
-    # функция для создания мока асинхронного контекстного менеджера(для подмены async with session.get(...) as response: ...)
-    def create_ae_context_manager(mock_response):
-        ctx = mocker.AsyncMock()
-        ctx.__aenter__.return_value = mock_response
-        return ctx
-
-    # coздаем моки ответов aiohttp get- и post- запросов
-    mock_get_response = create_response_mock(
-        status=aiohttp_response_status,
-        payload={
-            "user_id": authlib_user.get("id"),
-            "achievement": [
-                {
-                    "id": achievement_id,
-                }
-            ],
-        },
+    # мок aiohttp get- и post- запросов связанных с выдачей ачивки
+    mock_aiohttp_session = aiohttp_mock(
+        authlib_user_id=authlib_user.get("id"),
+        aiohttp_response_status=aiohttp_response_status,
+        achievement_id=achievement_id,
+        get_url=achive_get_url,
+        post_url=achive_post_url,
     )
-    mock_post_response = create_response_mock(payload={})
 
-    # словари ожидаемых ответов c запросов на конкретный url для side_effect
-    get_responses = {achive_get_url: create_ae_context_manager(mock_get_response)}
-    post_responses = {achive_post_url: mock_post_response}
-
-    # функции для side_effect моков get- и post- aiohttp запросов, если запрос был к не тому url, мок всегда вернет 404(не используется для проверки)
-    def get_side_effect(url, *args, **kwargs):
-        return get_responses.get(url, create_ae_context_manager(create_response_mock(status=status.HTTP_404_NOT_FOUND)))
-
-    def post_side_effect(url, *args, **kwargs):
-        return post_responses.get(url, (create_response_mock(status=status.HTTP_404_NOT_FOUND)))
-
-    # создаем мок сессии aiohttp.ClientSession
-    mock_aiohttp_session = mocker.AsyncMock()
-    # для мока session.get(...) используем MagicMock вместо AsyncMock, потому что это синхронный метод
-    mock_aiohttp_session.get = mocker.MagicMock(side_effect=get_side_effect)
-    mock_aiohttp_session.post.side_effect = post_side_effect
-    mock_aiohttp_session.__aenter__.return_value = mock_aiohttp_session
     mocker.patch("aiohttp.ClientSession", return_value=mock_aiohttp_session)
 
     params = {"lecturer_id": lecturers[lecturer_n].id}
