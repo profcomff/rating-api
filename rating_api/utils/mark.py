@@ -4,7 +4,6 @@ from sqlalchemy import ColumnExpressionArgument, UnaryExpression
 
 from rating_api.settings import get_settings
 
-
 settings = get_settings()
 
 

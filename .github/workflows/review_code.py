@@ -7,7 +7,6 @@ import sys
 import requests
 from mistralai.client import MistralClient
 
-
 client = MistralClient(api_key=os.environ.get("MISTRAL_API_KEY"))
 
 pr_number = os.environ.get("PR_NUMBER")

@@ -32,7 +32,6 @@ from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from .base import BaseDbModel
 
-
 logger = logging.getLogger(__name__)
 
 

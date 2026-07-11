@@ -22,7 +22,6 @@ from rating_api.schemas.models import (
     LecturerWithRank,
 )
 
-
 lecturer = APIRouter(prefix="/lecturer", tags=["Lecturer"])
 
 
