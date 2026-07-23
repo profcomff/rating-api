@@ -31,7 +31,6 @@ from rating_api.schemas.models import (
 )
 from rating_api.settings import Settings, get_settings
 
-
 settings: Settings = get_settings()
 comment = APIRouter(prefix="/comment", tags=["Comment"])
 

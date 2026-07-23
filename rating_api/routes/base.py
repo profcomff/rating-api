@@ -8,7 +8,6 @@ from rating_api.routes.comment import comment
 from rating_api.routes.lecturer import lecturer
 from rating_api.settings import Settings, get_settings
 
-
 settings: Settings = get_settings()
 app = FastAPI(
     title='Рейтинг преподавателей',

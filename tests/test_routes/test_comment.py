@@ -8,7 +8,6 @@ from starlette import status
 from rating_api.models import Comment, CommentReaction, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.settings import get_settings
 
-
 logger = logging.getLogger(__name__)
 url: str = '/comment'
 
