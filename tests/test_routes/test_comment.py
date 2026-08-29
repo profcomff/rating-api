@@ -792,3 +792,112 @@ def test_post_like(client, dbsession, comment):
     dbsession.refresh(comment)
     assert comment.like_count == 0
     assert comment.dislike_count == 0
+
+
+def test_comment_lecturer_limit(
+    client,
+    lecturers,
+    authlib_user,
+    mocker,
+):
+    """
+    Тест лимита на одного лектора
+    """
+    new_user = authlib_user.copy()
+    new_user["id"] = 99999
+
+    achive_get_url = settings.API_URL + f"achievement/user/{new_user.get('id')}"
+    achive_post_url = (
+        settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
+    )
+    mock_aiohttp_session = aiohttp_mock(
+        authlib_user_id=new_user.get("id"),
+        aiohttp_response_status=status.HTTP_200_OK,
+        achievement_id=settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+        get_url=achive_get_url,
+        post_url=achive_post_url,
+    )
+    mocker.patch("aiohttp.ClientSession", return_value=mock_aiohttp_session)
+
+    lecturer_id = lecturers[0].id
+    body = {
+        "subject": "Subject",
+        "text": "Text",
+        "mark_kindness": 1,
+        "mark_freebie": 0,
+        "mark_clarity": 0,
+    }
+
+    for _ in range(settings.COMMENT_TO_LECTURER_LIMIT - 1):
+        response = client.post(url, json=body, params={"lecturer_id": lecturer_id})
+        assert response.status_code == status.HTTP_200_OK
+
+    response_5 = client.post(url, json=body, params={"lecturer_id": lecturer_id})
+    assert response_5.status_code == status.HTTP_200_OK
+
+    response_6 = client.post(url, json=body, params={"lecturer_id": lecturer_id})
+    assert response_6.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+
+def test_comment_total_limit(
+    client,
+    dbsession,
+    mocker,
+):
+    """
+    Тест общего лимита комментариев пользователя за период
+    """
+    dbsession.query(LecturerUserComment).delete()
+    dbsession.query(Comment).delete()
+    dbsession.commit()
+
+    from rating_api.models import Lecturer
+
+    extra_lecturers = []
+    for i in range(5):
+        lecturer = Lecturer(
+            id=200 + i,
+            first_name=f"total_fname{i}",
+            last_name=f"total_lname{i}",
+            middle_name=f"total_mname{i}",
+            timetable_id=5000 + i,
+        )
+        dbsession.add(lecturer)
+        extra_lecturers.append(lecturer)
+    dbsession.commit()
+
+    for lecturer in extra_lecturers:
+        dbsession.refresh(lecturer)
+
+    new_user = {"id": 99999, "email": "test@example.com"}
+
+    achive_get_url = settings.API_URL + f"achievement/user/{new_user.get('id')}"
+    achive_post_url = (
+        settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
+    )
+    mock_aiohttp_session = aiohttp_mock(
+        authlib_user_id=new_user.get("id"),
+        aiohttp_response_status=status.HTTP_200_OK,
+        achievement_id=settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+        get_url=achive_get_url,
+        post_url=achive_post_url,
+    )
+    mocker.patch("aiohttp.ClientSession", return_value=mock_aiohttp_session)
+
+    body = {
+        "subject": "TestSubject",
+        "text": "TestText",
+        "mark_kindness": 1,
+        "mark_freebie": 0,
+        "mark_clarity": 0,
+    }
+
+    # По 4 коммента каждому из 5 лекторов = 20
+    for lecturer in extra_lecturers:
+        for _ in range(4):
+            response = client.post(url, json=body, params={"lecturer_id": lecturer.id})
+            assert response.status_code == status.HTTP_200_OK
+
+    # 21й - превышение лимита
+    response_21 = client.post(url, json=body, params={"lecturer_id": extra_lecturers[0].id})
+    assert response_21.status_code == status.HTTP_429_TOO_MANY_REQUESTS
