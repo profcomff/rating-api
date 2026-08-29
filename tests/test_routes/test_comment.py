@@ -808,7 +808,8 @@ def test_comment_lecturer_limit(
 
     achive_get_url = settings.API_URL + f"achievement/user/{new_user.get('id')}"
     achive_post_url = (
-        settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
+        settings.API_URL
+        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
     )
     mock_aiohttp_session = aiohttp_mock(
         authlib_user_id=new_user.get("id"),
@@ -873,7 +874,8 @@ def test_comment_total_limit(
 
     achive_get_url = settings.API_URL + f"achievement/user/{new_user.get('id')}"
     achive_post_url = (
-        settings.API_URL + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
+        settings.API_URL
+        + f"achievement/achievement/{settings.FIRST_COMMENT_ACHIEVEMENT_ID}/reciever/{new_user.get('id')}"
     )
     mock_aiohttp_session = aiohttp_mock(
         authlib_user_id=new_user.get("id"),
