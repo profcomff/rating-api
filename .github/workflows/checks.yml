@@ -29,13 +29,16 @@ jobs:
         run: |
           DB_DSN=postgresql://postgres@localhost:5432/postgres alembic upgrade head
       - name: Build coverage file
+        id: pytest
         run: |
           DB_DSN=postgresql://postgres@localhost:5432/postgres pytest --junitxml=pytest.xml --cov-report=term-missing:skip-covered --cov=rating_api tests/ | tee pytest-coverage.txt
+          exit ${PIPESTATUS[0]}
       - name: Print report
         if: always()
         run: |
           cat pytest-coverage.txt
       - name: Pytest coverage comment
+        if: always()
         uses: MishaKav/pytest-coverage-comment@main
         with:
           pytest-coverage-path: ./pytest-coverage.txt
@@ -50,7 +53,7 @@ jobs:
           junitxml-path: ./pytest.xml
           junitxml-title: Summary
       - name: Fail on pytest errors
-        if: steps.pytest.outcome == 'failure'
+        if: failure() && steps.pytest.outcome == 'failure'
         run: exit 1
   linting:
     runs-on: ubuntu-latest

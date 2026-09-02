@@ -16,6 +16,7 @@ settings = get_settings()
 
 @pytest.mark.parametrize('response_status', [status.HTTP_200_OK, status.HTTP_409_CONFLICT])
 def test_create_lecturer(client, dbsession, response_status):
+    assert False
     body = {"first_name": 'Иван', "last_name": 'Иванов', "middle_name": 'Иванович', "timetable_id": 0}
     post_response = client.post(url, json=body)
     assert post_response.status_code == response_status
