@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from starlette import status
 
-from rating_api.models import Comment, CommentReaction, LecturerUserComment, Reaction, ReviewStatus
+from rating_api.models import Comment, CommentReaction, Lecturer, LecturerUserComment, Reaction, ReviewStatus
 from rating_api.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,7 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
 
 
 @pytest.mark.parametrize(
-    'body,lecturer_n,response_status,aiohttp_response_status,achievement_id',
+    'body,lecturer_n,response_status,aiohttp_response_status,achievement_id,lecturer_comments_limit,total_comments_limit',
     [
         (  # тест логики выдачи ачивки за первый комментарий
             {
@@ -87,6 +87,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             0,
             status.HTTP_200_OK,
             status.HTTP_200_OK,
+            0,
+            0,
             0,
         ),
         (  # тест логики блокирующей выдачу ачивки за первый комментарий, если она уже есть у юзера
@@ -101,6 +103,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # тест логики выдачи ачивки в случае неудачного get-запроса к серверу
             {
@@ -114,6 +118,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             0,
+            0,
+            0,
         ),
         (
             {
@@ -127,6 +133,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (
             {
@@ -140,6 +148,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # bad mark
             {
@@ -153,6 +163,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # deleted lecturer
             {
@@ -166,6 +178,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_404_NOT_FOUND,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # Anonymous comment
             {
@@ -180,6 +194,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # NotAnonymous comment
             {
@@ -194,6 +210,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # Not provided anonymity
             {
@@ -207,6 +225,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # Bad anonymity
             {
@@ -221,6 +241,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # regex test
             {
@@ -238,6 +260,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # forbidden symbols
             {
@@ -254,6 +278,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # long comment
             {
@@ -268,6 +294,8 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_400_BAD_REQUEST,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
         ),
         (  # long comment but not that long
             {
@@ -282,6 +310,38 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
             status.HTTP_200_OK,
             status.HTTP_200_OK,
             settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            0,
+        ),
+        (
+            # Превышен лимит комментов от одного пользователя на одного лектора
+            {"subject": "test_subject", "text": "test text", "mark_kindness": 1, "mark_freebie": 0, "mark_clarity": 0},
+            0,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            settings.COMMENT_TO_LECTURER_LIMIT,
+            0,
+        ),
+        (
+            # Превышен общий лимит комментов от пользователя
+            {"subject": "test_subject", "text": "test text", "mark_kindness": 1, "mark_freebie": 0, "mark_clarity": 0},
+            0,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            0,
+            settings.COMMENT_LIMIT,
+        ),
+        (
+            # Превышены оба лимита
+            {"subject": "test_subject", "text": "test text", "mark_kindness": 1, "mark_freebie": 0, "mark_clarity": 0},
+            0,
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            status.HTTP_200_OK,
+            settings.FIRST_COMMENT_ACHIEVEMENT_ID,
+            settings.COMMENT_TO_LECTURER_LIMIT,
+            settings.COMMENT_LIMIT,
         ),
     ],
 )
@@ -289,6 +349,8 @@ def test_create_comment(
     client,
     dbsession,
     lecturers,
+    lecturer_factory,
+    comment_factory,
     authlib_user,
     mocker,
     body,
@@ -296,7 +358,28 @@ def test_create_comment(
     response_status,
     aiohttp_response_status,
     achievement_id,
+    lecturer_comments_limit,
+    total_comments_limit,
 ):
+    target_lecturer_id = lecturers[lecturer_n].id
+
+    # наполнение БД под лимит комментов лектору
+    if lecturer_comments_limit > 0:
+        comment_factory(target_lecturer_id, lecturer_comments_limit)
+
+    # наполнение БД под общий лимит пользователя
+    if total_comments_limit > 0:
+        remaining = total_comments_limit - lecturer_comments_limit
+        needed_lecturers_count = (remaining + settings.COMMENT_TO_LECTURER_LIMIT - 1) // (settings.COMMENT_TO_LECTURER_LIMIT - 1)
+        extra_lecturers = lecturer_factory(needed_lecturers_count)
+
+        for lecturer in extra_lecturers:
+            if remaining <= 0:
+                break
+            count = min(remaining, settings.COMMENT_TO_LECTURER_LIMIT - 1)
+            comment_factory(lecturer.id, count)
+            remaining -= count
+
     # url для проверки логики выдачи ачивок
     achive_get_url = settings.API_URL + f"achievement/user/{authlib_user.get('id'):}"
     achive_post_url = (
@@ -435,7 +518,7 @@ def test_create_comment(
             {
                 "comments": [
                     {
-                        "subdject": "string",
+                        "subject": "string",
                         "text": "string",
                         "mark_kindness": 0,
                         "mark_freebie": 0,
