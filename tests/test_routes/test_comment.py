@@ -73,77 +73,6 @@ def aiohttp_mock(authlib_user_id, aiohttp_response_status, achievement_id, get_u
     return mock_aiohttp_session
 
 
-@pytest.fixture
-def extra_lecturers(dbsession):
-    """Создает лекторов для наполнения общего лимита комментариев"""
-    needed_lecturers = (settings.COMMENT_LIMIT // settings.COMMENT_TO_LECTURER_LIMIT) + 1
-
-    lecturers = []
-    for i in range(needed_lecturers):
-        lecturer = Lecturer(
-            id=900 + i,
-            first_name=f"fname{i}",
-            last_name=f"lname{i}",
-            middle_name=f"mname{i}",
-            timetable_id=900 + i,
-        )
-        lecturers.append(lecturer)
-
-    dbsession.add_all(lecturers)
-    dbsession.commit()
-
-    yield lecturers
-
-    for lecturer in lecturers:
-        dbsession.delete(lecturer)
-    dbsession.commit()
-
-
-@pytest.fixture
-def comment_factory(dbsession, authlib_user):
-    """
-    Создает комментарии
-    """
-    user_id = authlib_user.get("id")
-    created_comment_uuids = []
-    created_user_comment_ids = []
-
-    def create_comments(lecturer_id: int, count: int):
-        for _ in range(count):
-            comment = Comment(
-                user_id=user_id,
-                lecturer_id=lecturer_id,
-                subject="Subject",
-                text="Text",
-                mark_kindness=1,
-                mark_freebie=0,
-                mark_clarity=0,
-                review_status=ReviewStatus.PENDING,
-            )
-            dbsession.add(comment)
-            dbsession.flush()
-            created_comment_uuids.append(comment.uuid)
-
-            user_comment = LecturerUserComment(lecturer_id=lecturer_id, user_id=user_id)
-            dbsession.add(user_comment)
-            dbsession.flush()
-            created_user_comment_ids.append(user_comment.id)
-
-        dbsession.commit()
-
-    yield create_comments
-
-    if created_user_comment_ids:
-        dbsession.query(LecturerUserComment).filter(LecturerUserComment.id.in_(created_user_comment_ids)).delete(
-            synchronize_session=False
-        )
-
-    if created_comment_uuids:
-        dbsession.query(Comment).filter(Comment.uuid.in_(created_comment_uuids)).delete(synchronize_session=False)
-
-    dbsession.commit()
-
-
 @pytest.mark.parametrize(
     'body,lecturer_n,response_status,aiohttp_response_status,achievement_id,lecturer_comments_limit,total_comments_limit',
     [
@@ -420,7 +349,7 @@ def test_create_comment(
     client,
     dbsession,
     lecturers,
-    extra_lecturers,
+    lecturer_factory,
     comment_factory,
     authlib_user,
     mocker,
@@ -441,6 +370,9 @@ def test_create_comment(
     # наполнение БД под общий лимит пользователя
     if total_comments_limit > 0:
         remaining = total_comments_limit - lecturer_comments_limit
+        needed_lecturers_count = (remaining + settings.COMMENT_TO_LECTURER_LIMIT - 1) // (settings.COMMENT_TO_LECTURER_LIMIT - 1)
+        extra_lecturers = lecturer_factory(needed_lecturers_count)
+
         for lecturer in extra_lecturers:
             if remaining <= 0:
                 break

@@ -216,41 +216,32 @@ def nonanonymous_comment(dbsession, lecturer):
     dbsession.commit()
 
 
-@pytest.fixture(scope='function')
-def lecturers(dbsession):
+@pytest.fixture
+def lecturers(dbsession, lecturer_factory):
     """
-    Creates 4 lecturers(one with flag is_deleted=True)
+    Создает 4 лекторов через фабрику (один с флагом is_deleted=True)
     """
-    lecturers_data = [
-        (1, "test_fname1", "test_lname1", "test_mname1", 9900),
-        (2, "test_fname2", "test_lname2", "test_mname2", 9901),
-        (3, "Bibka", "Bobka", "Bobkovich", 9902),
-    ]
+    created_lecturers = lecturer_factory(4)
 
-    lecturers = [
-        Lecturer(id=lecturer_id, first_name=fname, last_name=lname, middle_name=mname, timetable_id=timetable_id)
-        for lecturer_id, fname, lname, mname, timetable_id in lecturers_data
-    ]
-    lecturers.append(
-        Lecturer(id=4, first_name='test_fname3', last_name='test_lname3', middle_name='test_mname3', timetable_id=9903)
+    deleted_lecturer = created_lecturers[3]
+    deleted_lecturer.is_deleted = True
+    dbsession.commit()
+
+    yield created_lecturers
+
+    lecturer_ids = [l.id for l in created_lecturers]
+    
+    dbsession.query(Comment).filter(Comment.lecturer_id.in_(lecturer_ids)).delete(
+        synchronize_session=False
     )
-    lecturers[-1].is_deleted = True
-    for lecturer in lecturers:
-        dbsession.add(lecturer)
-    dbsession.commit()
-    yield lecturers
-    for lecturer in lecturers:
-        for row in lecturer.comments:
-            dbsession.delete(row)
-        lecturer_user_comments = dbsession.query(LecturerUserComment).filter(
-            LecturerUserComment.lecturer_id == lecturer.id
-        )
-        for row in lecturer_user_comments:
-            dbsession.delete(row)
-            dbsession.flush()
-        dbsession.delete(lecturer)
-    dbsession.commit()
+    dbsession.query(LecturerUserComment).filter(
+        LecturerUserComment.lecturer_id.in_(lecturer_ids)
+    ).delete(synchronize_session=False)
 
+    dbsession.query(Lecturer).filter(Lecturer.id.in_(lecturer_ids)).delete(
+        synchronize_session=False
+    )
+    dbsession.commit()
 
 @pytest.fixture
 def lecturers_with_comments(dbsession, lecturers):
@@ -307,4 +298,84 @@ def lecturers_with_comments(dbsession, lecturers):
     for comment in comments:
         dbsession.refresh(comment)
         dbsession.delete(comment)
+    dbsession.commit()
+
+
+@pytest.fixture
+def lecturer_factory(dbsession):
+    """
+    Создает лекторов
+    """
+    created = []
+
+    def create_lecturers(count: int=1) -> list[Lecturer]:
+        lecturers = []
+        for i in range(count):
+            cur_id = len(created)+1  
+            lecturer = Lecturer(
+                first_name=f"fname_{cur_id}",
+                last_name=f"lname_{cur_id}",
+                middle_name=f"mname_{cur_id}",
+                timetable_id=i+1,
+            )
+            lecturers.append(lecturer)
+            created.append(lecturer)
+
+        dbsession.add_all(lecturers)
+        dbsession.commit()
+        return lecturers
+
+    yield create_lecturers
+
+    for l in created:
+        if dbsession.is_active and l in dbsession:
+            dbsession.delete(l)
+    try:
+        dbsession.commit()
+    except Exception:
+        dbsession.rollback()
+
+
+@pytest.fixture
+def comment_factory(dbsession, authlib_user):
+    """
+    Создает комментарии
+    """
+    user_id = authlib_user.get("id")
+    created_comment_uuids = []
+    created_user_comment_ids = []
+
+    def create_comments(lecturer_id: int, count: int):
+        for _ in range(count):
+            comment = Comment(
+                user_id=user_id,
+                lecturer_id=lecturer_id,
+                subject="Subject",
+                text="Text",
+                mark_kindness=1,
+                mark_freebie=0,
+                mark_clarity=0,
+                review_status=ReviewStatus.PENDING,
+            )
+            dbsession.add(comment)
+            dbsession.flush()
+            created_comment_uuids.append(comment.uuid)
+
+            user_comment = LecturerUserComment(lecturer_id=lecturer_id, user_id=user_id)
+            dbsession.add(user_comment)
+            dbsession.flush()
+            created_user_comment_ids.append(user_comment.id)
+
+        dbsession.commit()
+
+    yield create_comments
+
+    if created_user_comment_ids:
+        dbsession.query(LecturerUserComment).filter(LecturerUserComment.id.in_(created_user_comment_ids)).delete(
+            synchronize_session=False
+        )
+
+    if created_comment_uuids:
+        dbsession.query(Comment).filter(Comment.uuid.in_(created_comment_uuids)).delete(synchronize_session=False)
+
     dbsession.commit()
