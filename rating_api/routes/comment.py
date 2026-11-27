@@ -204,8 +204,10 @@ async def get_comments(
     user_id: int | None = None,
     subject: str | None = None,
     order_by: str = Query(
-        enum=["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "like_diff"],
         default="create_ts",
+        json_schema_extra={
+            "enum": ["create_ts", "mark_kindness", "mark_freebie", "mark_clarity", "mark_general", "like_diff"],
+        },
     ),
     unreviewed: bool = False,
     asc_order: bool = False,
