@@ -1,6 +1,7 @@
 import datetime
 import logging
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 from starlette import status
@@ -757,19 +758,40 @@ def test_update_comment(client, dbsession, nonanonymous_comment, body, response_
             assert getattr(nonanonymous_comment, k, None) == v  # Есть ли изменения в БД
 
 
-# TODO: переписать под новую логику
-# def test_delete_comment(client, dbsession, comment):
-#     response = client.delete(f'{url}/{comment.uuid}')
-#     assert response.status_code == status.HTTP_200_OK
-#     response = client.get(f'{url}/{comment.uuid}')
-#     assert response.status_code == status.HTTP_404_NOT_FOUND
-#     random_uuid = uuid.uuid4()
-#     response = client.delete(f'{url}/{random_uuid}')
-#     assert response.status_code == status.HTTP_404_NOT_FOUND
-#     dbsession.refresh(comment)
-#     assert comment.is_deleted
-#     response = client.get(f'{url}/{comment.uuid}')
-#     assert response.status_code == status.HTTP_404_NOT_FOUND
+@pytest.mark.parametrize(
+    'comment_user_id, can_moderate, expected_status',
+    [
+        pytest.param(0, False, status.HTTP_200_OK, id='own-comment'),
+        pytest.param(1, False, status.HTTP_403_FORBIDDEN, id='another-users-comment'),
+        pytest.param(None, False, status.HTTP_403_FORBIDDEN, id='anonymous-comment'),
+        pytest.param(1, True, status.HTTP_200_OK, id='moderator-deletes-another-users-comment'),
+        pytest.param(None, True, status.HTTP_200_OK, id='moderator-deletes-anonymous-comment'),
+    ],
+)
+def test_delete_comment(client, dbsession, comment, authlib_user, comment_user_id, can_moderate, expected_status):
+    comment.user_id = comment_user_id
+    dbsession.commit()
+    if can_moderate:
+        authlib_user['session_scopes'] = [{'name': 'rating.comment.delete'}]
+    comment_url = f'{url}/{comment.uuid}'
+
+    response = client.delete(comment_url)
+
+    assert response.status_code == expected_status
+    dbsession.refresh(comment)
+    if expected_status == status.HTTP_200_OK:
+        assert comment.is_deleted
+        assert client.get(comment_url).status_code == status.HTTP_404_NOT_FOUND
+        assert client.delete(comment_url).status_code == status.HTTP_404_NOT_FOUND
+    else:
+        assert not comment.is_deleted
+        assert client.get(comment_url).status_code == status.HTTP_200_OK
+
+
+def test_delete_missing_comment(client, dbsession):
+    response = client.delete(f'{url}/{uuid4()}')
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_post_like(client, dbsession, comment):
